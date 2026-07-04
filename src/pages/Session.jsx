@@ -1,123 +1,105 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api/axios";
+import DataTable from "../components/DataTable";
+import { Edit, Trash2, Plus, RefreshCw } from "lucide-react";
 
 export default function Session() {
   const [sessions, setSessions] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ 
-    name: "", 
-    term: "", 
-    is_current: false 
-  });
+  const [form, setForm] = useState({ name: "", term: "", is_current: false });
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [apiResponse, setApiResponse] = useState(null);
 
   const fetchSessions = async () => {
-  try {
-    setLoading(true);
-    console.log("📡 Fetching sessions...");
-    
-    // Get auth token
-    const token = localStorage.getItem('token');
-    console.log("🔑 Token exists:", !!token);
-    
-    // Get user info
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    console.log("👤 User school ID:", user.school?.id);
-    
-    // Make API call
-    const res = await api.get("/school-sessions");
-    
-    console.log("✅ API Response Status:", res.status);
-    console.log("✅ Full Response Data:", res.data);
-    
-    // Check response structure
-    if (!res.data) {
-      console.error("❌ No data in response");
-      toast.error("No data received from server");
-      setSessions([]);
-      return;
-    }
-    
-    // Handle different response formats
-    let sessionsData = [];
-    
-    // Method 1: Check if response.data has data property
-    if (res.data.data && Array.isArray(res.data.data)) {
-      sessionsData = res.data.data;
-      console.log("📋 Using res.data.data (array)");
-    }
-    // Method 2: Check if response is directly an array
-    else if (Array.isArray(res.data)) {
-      sessionsData = res.data;
-      console.log("📋 Using res.data (direct array)");
-    }
-    // Method 3: If it's an object, check for any array property
-    else if (res.data && typeof res.data === 'object') {
-      // Look for any array in the object
-      for (const key in res.data) {
-        if (Array.isArray(res.data[key])) {
-          sessionsData = res.data[key];
-          console.log(`📋 Found array in property: ${key}`);
-          break;
+    try {
+      setLoading(true);
+      console.log("📡 Fetching sessions...");
+      
+      const token = localStorage.getItem('token');
+      console.log("🔑 Token exists:", !!token);
+      
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      console.log("👤 User school ID:", user.school?.id);
+      
+      const res = await api.get("/school-sessions");
+      
+      console.log("✅ API Response Status:", res.status);
+      console.log("✅ Full Response Data:", res.data);
+      
+      if (!res.data) {
+        console.error("❌ No data in response");
+        toast.error("No data received from server");
+        setSessions([]);
+        return;
+      }
+      
+      let sessionsData = [];
+      
+      if (res.data.data && Array.isArray(res.data.data)) {
+        sessionsData = res.data.data;
+        console.log("📋 Using res.data.data (array)");
+      }
+      else if (Array.isArray(res.data)) {
+        sessionsData = res.data;
+        console.log("📋 Using res.data (direct array)");
+      }
+      else if (res.data && typeof res.data === 'object') {
+        for (const key in res.data) {
+          if (Array.isArray(res.data[key])) {
+            sessionsData = res.data[key];
+            console.log(`📋 Found array in property: ${key}`);
+            break;
+          }
         }
       }
-    }
-    
-    console.log(`📋 Found ${sessionsData.length} sessions:`, sessionsData);
-    
-    // Ensure it's an array
-    if (!Array.isArray(sessionsData)) {
-      console.error("❌ sessionsData is not an array:", sessionsData);
-      sessionsData = [];
-    }
-    
-    setSessions(sessionsData);
-    
-    if (sessionsData.length === 0) {
-      console.log("ℹ️ No sessions found. Possible reasons:");
-      console.log("   1. No sessions created for this school");
-      console.log("   2. API returned empty array");
-      console.log("   3. School ID mismatch");
       
-      // Show helpful message
-      toast.info("No sessions found. Create your first session.");
+      console.log(`📋 Found ${sessionsData.length} sessions:`, sessionsData);
+      
+      if (!Array.isArray(sessionsData)) {
+        console.error("❌ sessionsData is not an array:", sessionsData);
+        sessionsData = [];
+      }
+      
+      setSessions(sessionsData);
+      
+      if (sessionsData.length === 0) {
+        console.log("ℹ️ No sessions found.");
+        toast.info("No sessions found. Create your first session.");
+      }
+      
+    } catch (error) {
+      console.error("❌ Fetch error details:", {
+        message: error.message,
+        response: error.response,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      
+      if (error.response?.status === 403) {
+        toast.error("Access denied. Please check your permissions.");
+      } else if (error.response?.status === 401) {
+        toast.error("Please log in again.");
+        localStorage.clear();
+        window.location.href = '/login';
+      } else if (error.response?.status === 500) {
+        toast.error("Server error. Please try again later.");
+      } else {
+        toast.error("Failed to load sessions: " + (error.message || "Unknown error"));
+      }
+      
+      setSessions([]);
+    } finally {
+      setLoading(false);
     }
-    
-  } catch (error) {
-    console.error("❌ Fetch error details:", {
-      message: error.message,
-      response: error.response,
-      status: error.response?.status,
-      data: error.response?.data
-    });
-    
-    if (error.response?.status === 403) {
-      toast.error("Access denied. Please check your permissions.");
-      console.log("🔑 Current auth token:", localStorage.getItem('token'));
-    } else if (error.response?.status === 401) {
-      toast.error("Please log in again.");
-      localStorage.clear();
-      window.location.href = '/login';
-    } else if (error.response?.status === 500) {
-      toast.error("Server error. Please try again later.");
-    } else {
-      toast.error("Failed to load sessions: " + (error.message || "Unknown error"));
-    }
-    
-    setSessions([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
       
-      // Get user's school ID from localStorage
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const schoolId = user.school?.id;
       
@@ -130,7 +112,6 @@ export default function Session() {
         return;
       }
       
-      // Prepare payload with school_id
       const payload = {
         name: form.name,
         term: form.term,
@@ -156,7 +137,7 @@ export default function Session() {
         setShowModal(false);
         setForm({ name: "", term: "", is_current: false });
         setEditId(null);
-        fetchSessions(); // Refresh the list
+        fetchSessions();
       } else {
         throw new Error(response.data.message || 'Save failed');
       }
@@ -219,7 +200,6 @@ export default function Session() {
     }
   };
 
-  // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return "Not set";
     try {
@@ -238,7 +218,6 @@ export default function Session() {
     fetchSessions();
   };
 
-  // Debug: Log the current state
   useEffect(() => {
     console.log("🔍 Current sessions state:", {
       sessions,
@@ -249,8 +228,61 @@ export default function Session() {
     });
   }, [sessions, apiResponse]);
 
-  // Safe rendering - ensure sessions is always an array
   const safeSessions = Array.isArray(sessions) ? sessions : [];
+
+  // ========== DATATABLE CONFIGURATION ==========
+  const tableColumns = [
+    { header: "Session Name", accessor: "name", width: "200px" },
+    { header: "Term", accessor: "term", width: "150px" },
+    { header: "Status", accessor: "status_badge", width: "100px" },
+    { header: "Created", accessor: "created_date", width: "150px" },
+  ];
+
+  const getTableData = () => {
+    return safeSessions.map((session, index) => ({
+      id: session.id,
+      name: session.name,
+      term: session.term,
+      status_badge: (
+        <span className={`px-2 py-1 rounded text-xs ${
+          session.is_current 
+            ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+            : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
+        }`}>
+          {session.is_current ? "Active" : "Inactive"}
+        </span>
+      ),
+      created_date: session.created_at ? formatDate(session.created_at) : 'N/A',
+      original: session
+    }));
+  };
+
+  const renderActions = (row) => (
+    <div className="flex items-center justify-end gap-2">
+      <button 
+        onClick={() => handleEdit(row.original)} 
+        className="text-yellow-400 hover:text-yellow-300 p-1"
+        title="Edit"
+      >
+        <Edit className="h-4 w-4" />
+      </button>
+      <button 
+        onClick={() => handleDelete(row.original.id)} 
+        className="text-red-400 hover:text-red-300 p-1"
+        title="Delete"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
+  const handleTableSearch = (data, term) => {
+    const lowerTerm = term.toLowerCase();
+    return data.filter(item => 
+      item.name?.toLowerCase().includes(lowerTerm) ||
+      item.term?.toLowerCase().includes(lowerTerm)
+    );
+  };
 
   return (
     <div className="text-white p-6 bg-gradient-to-br from-slate-900 to-gray-900 min-h-screen">
@@ -260,15 +292,15 @@ export default function Session() {
           <h3 className="text-sm font-semibold text-blue-300">Debug Info</h3>
           <button
             onClick={handleRefresh}
-            className="text-xs px-2 py-1 bg-blue-600 rounded hover:bg-blue-700"
+            className="text-xs px-2 py-1 bg-blue-600 rounded hover:bg-blue-700 flex items-center gap-1"
           >
+            <RefreshCw className="h-3 w-3" />
             Refresh
           </button>
         </div>
         <div className="text-xs space-y-1">
           <p className="text-blue-200">Sessions: {safeSessions.length} items</p>
           <p className="text-blue-200">Is Array: {Array.isArray(sessions) ? '✅ Yes' : '❌ No'}</p>
-          <p className="text-blue-200">Type: {typeof sessions}</p>
           <button 
             onClick={() => {
               console.log("🔍 Full debug info:", {
@@ -296,12 +328,11 @@ export default function Session() {
             disabled={loading}
             className="bg-slate-700 px-4 py-2 rounded hover:bg-slate-600 disabled:bg-slate-800 flex items-center space-x-2"
           >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
-            {loading && <span className="animate-spin">⟳</span>}
           </button>
           <button 
             onClick={() => {
-              // Set default values
               const currentYear = new Date().getFullYear();
               const nextYear = currentYear + 1;
               
@@ -316,95 +347,24 @@ export default function Session() {
             className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-400 flex items-center space-x-2"
             disabled={loading}
           >
-            <span>+ Add Session</span>
+            <Plus className="h-4 w-4" />
+            <span>Add Session</span>
           </button>
         </div>
       </div>
 
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-4 border border-slate-700/50">
-        {loading && safeSessions.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
-            <div className="text-gray-300">Loading sessions...</div>
-            <p className="text-gray-500 text-sm mt-1">Please wait while we fetch your data</p>
-          </div>
-        ) : safeSessions.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="text-gray-300 text-lg font-medium mb-2">No sessions found</div>
-            <p className="text-gray-500 mb-4">Create your first academic session</p>
-            <button 
-              onClick={() => {
-                const currentYear = new Date().getFullYear();
-                const nextYear = currentYear + 1;
-                
-                setForm({ 
-                  name: `${currentYear}/${nextYear}`,
-                  term: "First Term",
-                  is_current: false 
-                });
-                setEditId(null);
-                setShowModal(true);
-              }} 
-              className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
-            >
-              Create First Session
-            </button>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="text-gray-300 border-b border-gray-700">
-                <tr>
-                  <th className="py-3 px-4 font-medium">#</th>
-                  <th className="py-3 px-4 font-medium">Session Name</th>
-                  <th className="py-3 px-4 font-medium">Term</th>
-                  <th className="py-3 px-4 font-medium">Status</th>
-                  <th className="py-3 px-4 font-medium">Created</th>
-                  <th className="py-3 px-4 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {safeSessions.map((session, index) => (
-                  <tr key={session.id} className="border-b border-gray-700/50 hover:bg-slate-800/30">
-                    <td className="py-3 px-4">{index + 1}</td>
-                    <td className="py-3 px-4 font-medium">{session.name}</td>
-                    <td className="py-3 px-4">{session.term}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        session.is_current 
-                          ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
-                          : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
-                      }`}>
-                        {session.is_current ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-gray-400 text-sm">
-                      {session.created_at ? formatDate(session.created_at) : 'N/A'}
-                    </td>
-                    <td className="py-3 px-4 text-right space-x-3">
-                      <button 
-                        onClick={() => handleEdit(session)} 
-                        className="text-yellow-400 hover:text-yellow-300 hover:underline px-2 py-1 rounded bg-yellow-500/10 hover:bg-yellow-500/20"
-                        disabled={loading}
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(session.id)} 
-                        className="text-red-400 hover:text-red-300 hover:underline px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20"
-                        disabled={loading}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* Data Table */}
+      <DataTable
+        columns={tableColumns}
+        data={getTableData()}
+        loading={loading && safeSessions.length === 0}
+        title="Academic Sessions"
+        searchPlaceholder="Search by session name or term..."
+        onSearch={handleTableSearch}
+        actions={renderActions}
+      />
 
+      {/* Modal - Add/Edit Session */}
       {showModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-50 p-4">
           <div className="bg-gradient-to-br from-slate-800 to-gray-900 p-6 rounded-lg w-full max-w-md border border-slate-700/50">
@@ -501,9 +461,7 @@ export default function Session() {
                       <span>Saving...</span>
                     </>
                   ) : (
-                    <>
-                      <span>{editId ? "Update" : "Create"} Session</span>
-                    </>
+                    <span>{editId ? "Update" : "Create"} Session</span>
                   )}
                 </button>
               </div>

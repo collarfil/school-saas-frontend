@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api/axios";
+import DataTable from "../components/DataTable";
+import { Edit, Trash2, Plus } from "lucide-react";
 
 export default function Grade() {
   const [grades, setGrades] = useState([]);
@@ -11,7 +13,6 @@ export default function Grade() {
   const [loading, setLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
 
-  // Get school ID and user from localStorage
   const getSchoolId = () => {
     const user = JSON.parse(localStorage.getItem('user'));
     return user?.school?.id || user?.school_id;
@@ -38,7 +39,6 @@ export default function Grade() {
         params: { school_id: schoolId }
       });
       
-      // Handle API response format
       const gradesData = res.data?.data || res.data || [];
       setGrades(gradesData);
       
@@ -68,7 +68,6 @@ export default function Grade() {
         params: { school_id: schoolId }
       });
       
-      // Handle API response format
       const sectionsData = res.data?.data || res.data || [];
       setSections(sectionsData);
       
@@ -107,7 +106,6 @@ export default function Grade() {
 
     setLoading(true);
     try {
-      // Prepare data with school_id
       const submitData = {
         name: form.name.trim(),
         section_id: form.section_id,
@@ -122,11 +120,8 @@ export default function Grade() {
         toast.success("Grade added successfully!");
       }
       
-      // Reset form and close modal
       setShowModal(false);
       resetForm();
-      
-      // Refresh data
       fetchGrades();
       
     } catch (error) {
@@ -171,7 +166,6 @@ export default function Grade() {
       });
       toast.success("Grade deleted successfully");
       
-      // Update local state
       setGrades(prev => prev.filter(grade => grade.id !== id));
       
     } catch (error) {
@@ -201,13 +195,60 @@ export default function Grade() {
     setShowModal(true);
   };
 
-  // Get user info for display
   const user = getUser();
   const schoolId = getSchoolId();
 
+  // ========== DATATABLE CONFIGURATION ==========
+  const tableColumns = [
+    { header: "Grade Name", accessor: "name", width: "250px" },
+    { header: "Section", accessor: "section_name", width: "200px" },
+    { header: "School", accessor: "school_name", width: "250px" },
+  ];
+
+  const getTableData = () => {
+    return grades.map((grade, index) => ({
+      id: grade.id,
+      name: grade.name,
+      section_name: (
+        <span className="px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-300">
+          {getSectionName(grade.section_id)}
+        </span>
+      ),
+      school_name: grade.school?.name || "N/A",
+      original: grade,
+      index: index
+    }));
+  };
+
+  const renderActions = (row) => (
+    <div className="flex items-center justify-end gap-2">
+      <button
+        onClick={() => handleEdit(row.original)}
+        className="text-yellow-400 hover:text-yellow-300 p-1"
+        title="Edit"
+      >
+        <Edit className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => handleDelete(row.original.id)}
+        className="text-red-400 hover:text-red-300 p-1"
+        title="Delete"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
+  const handleTableSearch = (data, term) => {
+    const lowerTerm = term.toLowerCase();
+    return data.filter(item => 
+      item.name?.toLowerCase().includes(lowerTerm) ||
+      getSectionName(item.original?.section_id)?.toLowerCase().includes(lowerTerm)
+    );
+  };
+
   return (
     <div className="text-white p-6">
-      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-bold">Grades</h2>
@@ -217,10 +258,11 @@ export default function Grade() {
         </div>
         <button 
           onClick={openAddModal} 
-          className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-400"
+          className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-400 flex items-center gap-2"
           disabled={loading || isFetching}
         >
-          + Add Grade
+          <Plus className="h-4 w-4" />
+          Add Grade
         </button>
       </div>
 
@@ -234,67 +276,16 @@ export default function Grade() {
         </div>
       </div>
 
-      {/* Grades Table */}
-      <div className="bg-slate-800 rounded-lg p-4">
-        {isFetching ? (
-          <div className="text-center py-8 text-gray-400">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-            Loading grades...
-          </div>
-        ) : grades.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-400 mb-4">No grades found.</p>
-            <button
-              onClick={openAddModal}
-              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
-            >
-              Create Your First Grade
-            </button>
-          </div>
-        ) : (
-          <table className="w-full text-left">
-            <thead className="text-gray-300 border-b border-gray-700">
-              <tr>
-                <th className="py-3 px-4 font-semibold">#</th>
-                <th className="py-3 px-4 font-semibold">Grade Name</th>
-                <th className="py-3 px-4 font-semibold">Section</th>
-                <th className="py-3 px-4 font-semibold">School</th>
-                <th className="py-3 px-4 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {grades.map((grade, index) => (
-                <tr key={grade.id} className="border-b border-gray-700 hover:bg-slate-700/40">
-                  <td className="py-3 px-4">{index + 1}</td>
-                  <td className="py-3 px-4 font-medium">{grade.name}</td>
-                  <td className="py-3 px-4">
-                    <span className="px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-300">
-                      {getSectionName(grade.section_id)}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-gray-300">
-                    {grade.school?.name || "N/A"}
-                  </td>
-                  <td className="py-3 px-4 text-right space-x-3">
-                    <button
-                      onClick={() => handleEdit(grade)}
-                      className="text-yellow-400 hover:text-yellow-300 font-medium"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(grade.id)}
-                      className="text-red-400 hover:text-red-300 font-medium"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Data Table */}
+      <DataTable
+        columns={tableColumns}
+        data={getTableData()}
+        loading={isFetching}
+        title="Grade Records"
+        searchPlaceholder="Search by grade name or section..."
+        onSearch={handleTableSearch}
+        actions={renderActions}
+      />
 
       {/* Add/Edit Modal */}
       {showModal && (

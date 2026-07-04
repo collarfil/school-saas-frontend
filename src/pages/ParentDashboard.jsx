@@ -7,12 +7,15 @@ import {
   Bell,
   TrendingUp,
   Award,
-  Shield
+  Shield,
+  LogOut
 } from 'lucide-react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 export default function ParentDashboard() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [children, setChildren] = useState([]);
@@ -22,6 +25,15 @@ export default function ParentDashboard() {
     feeStatus: 'Paid',
     outstandingBalance: 0
   });
+
+  // Logout function
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    delete api.defaults.headers.common["Authorization"];
+    navigate("/login", { replace: true });
+    toast.success("Logged out successfully");
+  };
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -97,6 +109,48 @@ export default function ParentDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-gray-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
+        // Add to header section of each dashboard
+      <div className="flex items-center space-x-3">
+        <button
+          onClick={() => setShowChat(true)}
+          className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+          title="Chat"
+        >
+          <Users className="h-5 w-5" />
+        </button>
+        <button
+          onClick={() => setShowWhatsApp(true)}
+          className="p-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+          title="WhatsApp"
+        >
+          <Phone className="h-5 w-5" />
+        </button>
+        {user?.role === 'admin' && (
+          <button
+            onClick={() => navigate('/video-classes')}
+            className="p-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+            title="Video Classes"
+          >
+            <Video className="h-5 w-5" />
+          </button>
+        )}
+      </div>
+
+      // Add state at top of component
+      const [showChat, setShowChat] = useState(false);
+      const [showWhatsApp, setShowWhatsApp] = useState(false);
+      const [selectedConversation, setSelectedConversation] = useState(null);
+
+      // Add modals at bottom
+      {showChat && (
+        <MessagingComponent
+          conversationId={selectedConversation}
+          onClose={() => setShowChat(false)}
+        />
+      )}
+      {showWhatsApp && (
+        <WhatsAppMessaging onClose={() => setShowWhatsApp(false)} />
+      )}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
@@ -113,6 +167,14 @@ export default function ParentDashboard() {
               </div>
               <button className="p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors">
                 <Bell className="h-5 w-5 text-gray-300" />
+              </button>
+              {/* Logout Button */}
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Logout</span>
               </button>
             </div>
           </div>

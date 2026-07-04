@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api/axios";
+import DataTable from "../components/DataTable";
+import { Edit, Trash2, Plus } from "lucide-react";
 
 export default function Section() {
   const [sections, setSections] = useState([]);
@@ -9,7 +11,6 @@ export default function Section() {
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Get school_id from user data in localStorage
   const getSchoolId = () => {
     const user = JSON.parse(localStorage.getItem('user'));
     return user?.school?.id || user?.school_id;
@@ -31,7 +32,6 @@ export default function Section() {
       
       console.log("📂 Sections data:", res.data);
       
-      // Handle both response formats
       if (res.data.status === 'success') {
         setSections(res.data.data || []);
       } else {
@@ -136,12 +136,54 @@ export default function Section() {
     }
   };
 
-  // Initialize form with school_id on modal open
   const handleOpenModal = () => {
     const schoolId = getSchoolId();
     setForm({ name: "", school_id: schoolId });
     setEditId(null);
     setShowModal(true);
+  };
+
+  // ========== DATATABLE CONFIGURATION ==========
+  const tableColumns = [
+    { header: "Name", accessor: "name", width: "300px" },
+    { header: "School", accessor: "school_name", width: "300px" },
+  ];
+
+  const getTableData = () => {
+    return sections.map((section, index) => ({
+      id: section.id,
+      name: section.name,
+      school_name: section.school?.name || "N/A",
+      original: section,
+      index: index
+    }));
+  };
+
+  const renderActions = (row) => (
+    <div className="flex items-center justify-end gap-2">
+      <button 
+        onClick={() => handleEdit(row.original)} 
+        className="text-yellow-400 hover:text-yellow-300 p-1"
+        title="Edit"
+      >
+        <Edit className="h-4 w-4" />
+      </button>
+      <button 
+        onClick={() => handleDelete(row.original.id)} 
+        className="text-red-400 hover:text-red-300 p-1"
+        title="Delete"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
+  const handleTableSearch = (data, term) => {
+    const lowerTerm = term.toLowerCase();
+    return data.filter(item => 
+      item.name?.toLowerCase().includes(lowerTerm) ||
+      item.school_name?.toLowerCase().includes(lowerTerm)
+    );
   };
 
   return (
@@ -150,10 +192,11 @@ export default function Section() {
         <h2 className="text-2xl font-bold">Sections</h2>
         <button 
           onClick={handleOpenModal} 
-          className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-400"
+          className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-400 flex items-center gap-2"
           disabled={loading}
         >
-          + Add Section
+          <Plus className="h-4 w-4" />
+          Add Section
         </button>
       </div>
 
@@ -166,62 +209,18 @@ export default function Section() {
         </div>
       </div>
 
-      <div className="bg-slate-800 rounded-lg p-4">
-        {loading ? (
-          <div className="text-center py-4">Loading sections...</div>
-        ) : (
-          <table className="w-full text-left">
-            <thead className="text-gray-300 border-b border-gray-700">
-              <tr>
-                <th className="py-2 px-3">#</th>
-                <th className="py-2 px-3">Name</th>
-                <th className="py-2 px-3">School</th>
-                <th className="py-2 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sections.length > 0 ? (
-                sections.map((section, i) => (
-                  <tr key={section.id} className="border-b border-gray-700 hover:bg-slate-700/40">
-                    <td className="py-2 px-3">{i + 1}</td>
-                    <td className="py-2 px-3 font-medium">{section.name}</td>
-                    <td className="py-2 px-3 text-gray-300">
-                      {section.school?.name || "N/A"}
-                    </td>
-                    <td className="py-2 px-3 text-right space-x-3">
-                      <button 
-                        onClick={() => handleEdit(section)} 
-                        className="text-yellow-400 hover:text-yellow-300 font-medium"
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(section.id)} 
-                        className="text-red-400 hover:text-red-300 font-medium"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="4" className="text-center py-8 text-gray-400">
-                    <div className="flex flex-col items-center">
-                      <svg className="w-12 h-12 text-gray-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                      </svg>
-                      <p className="text-lg">No sections found</p>
-                      <p className="text-sm mt-1">Add your first section to get started</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Data Table */}
+      <DataTable
+        columns={tableColumns}
+        data={getTableData()}
+        loading={loading}
+        title="Section Records"
+        searchPlaceholder="Search by section name..."
+        onSearch={handleTableSearch}
+        actions={renderActions}
+      />
 
+      {/* Modal - Add/Edit Section */}
       {showModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50">
           <div className="bg-slate-800 p-6 rounded-lg w-96 border border-slate-700">

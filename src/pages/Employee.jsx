@@ -1,16 +1,21 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import toast from "react-hot-toast";
+import CredentialsModal from "../components/CredentialsModal";
+import DataTable from "../components/DataTable";
+import { Edit, Trash2, Plus } from "lucide-react";
 
 export default function Employee() {
   const [employees, setEmployees] = useState([]);
-  const [show, setShow] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [newCredentials, setNewCredentials] = useState(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
     phone: "",
-    role: "teacher",
-    school_id: "" // Added school_id
+    employee_type: "teaching",
+    school_id: ""
   });
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -77,7 +82,7 @@ export default function Employee() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaveLoading(true);
-    
+
     const schoolId = getSchoolId();
     if (!schoolId) {
       toast.error("No school ID found. Please login again.");
@@ -87,32 +92,43 @@ export default function Employee() {
 
     try {
       const payload = {
-        ...form,
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        employee_type: form.employee_type,
         school_id: schoolId
       };
 
+      console.log("📤 Sending payload:", payload);
+
+      let response;
       if (editId) {
         await api.put(`/employees/${editId}`, payload);
         toast.success("Employee updated successfully");
       } else {
-        await api.post("/employees", payload);
+        response = await api.post("/employees", payload);
         toast.success("Employee added successfully");
+        
+        // Show credentials modal for new employee
+        if (response.data.credentials) {
+          setNewCredentials(response.data.credentials);
+          setShowCredentialsModal(true);
+        }
       }
       
       resetForm();
-      setShow(false);
+      setShowModal(false);
       await fetchAll();
     } catch (err) {
       console.error("❌ Save employee error:", err.response?.data || err);
       
       if (err.response?.data?.errors) {
-        Object.values(err.response.data.errors).forEach(messages => {
-          messages.forEach(message => toast.error(message));
+        const errors = err.response.data.errors;
+        Object.keys(errors).forEach(field => {
+          errors[field].forEach(message => toast.error(`${field}: ${message}`));
         });
       } else if (err.response?.data?.message) {
         toast.error(err.response.data.message);
-      } else if (err.response?.status === 422) {
-        toast.error("Validation error. Please check all fields.");
       } else {
         toast.error("Failed to save employee.");
       }
@@ -143,14 +159,14 @@ export default function Employee() {
       name: "",
       email: "",
       phone: "",
-      role: "teacher",
+      employee_type: "teaching",
       school_id: schoolId
     });
     setEditId(null);
   };
 
   const closeModal = () => {
-    setShow(false);
+    setShowModal(false);
     resetForm();
   };
 
@@ -160,111 +176,109 @@ export default function Employee() {
       name: "",
       email: "",
       phone: "",
-      role: "teacher",
+      employee_type: "teaching",
       school_id: schoolId
     });
     setEditId(null);
-    setShow(true);
+    setShowModal(true);
+  };
+
+  const handleEdit = (employee) => {
+    const schoolId = getSchoolId();
+    setForm({
+      name: employee.name || "",
+      email: employee.email || "",
+      phone: employee.phone || "",
+      employee_type: employee.employee_type || "teaching",
+      school_id: schoolId
+    });
+    setEditId(employee.id);
+    setShowModal(true);
+  };
+
+  const getEmployeeTypeLabel = (type) => {
+    if (type === 'teaching') return 'Teaching Staff';
+    if (type === 'non_teaching') return 'Non-Teaching Staff';
+    return type || 'Unknown';
+  };
+
+  // ========== DATATABLE CONFIGURATION ==========
+  const tableColumns = [
+    { header: "#", accessor: "index", width: "50px" },
+    { header: "Name", accessor: "name", width: "200px" },
+    { header: "Email", accessor: "email", width: "250px" },
+    { header: "Phone", accessor: "phone", width: "150px" },
+    { header: "Type", accessor: "employee_type_label", width: "150px" },
+  ];
+
+  const getTableData = () => {
+    return employees.map((employee, index) => ({
+      id: employee.id,
+      index: index + 1,
+      name: employee.name,
+      email: employee.email || "N/A",
+      phone: employee.phone || "N/A",
+      employee_type_label: getEmployeeTypeLabel(employee.employee_type),
+      original: employee
+    }));
+  };
+
+  const renderTableActions = (row) => (
+    <div className="flex items-center justify-end gap-2">
+      <button
+        onClick={() => handleEdit(row.original)}
+        className="text-yellow-400 hover:text-yellow-300 p-1"
+        title="Edit"
+      >
+        <Edit className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => handleDelete(row.original.id)}
+        className="text-red-400 hover:text-red-300 p-1"
+        title="Delete"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
+  const handleTableSearch = (data, term) => {
+    const lowerTerm = term.toLowerCase();
+    return data.filter(item => 
+      item.name?.toLowerCase().includes(lowerTerm) ||
+      item.email?.toLowerCase().includes(lowerTerm) ||
+      item.phone?.toLowerCase().includes(lowerTerm) ||
+      item.employee_type_label?.toLowerCase().includes(lowerTerm)
+    );
   };
 
   return (
     <div className="text-white p-6">
-      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Employees</h2>
         <button
           onClick={handleOpenModal}
-          className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors font-medium disabled:bg-blue-400"
+          className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
           disabled={loading}
         >
-          {loading ? "Loading..." : "+ Add Employee"}
+          <Plus className="h-4 w-4" />
+          {loading ? "Loading..." : "Add Employee"}
         </button>
       </div>
 
-      {/* Debug info */}
-      <div className="mb-4 p-3 bg-slate-800 rounded text-sm">
-        <div className="text-gray-300">
-          <strong>School ID:</strong> {getSchoolId() || "Not found"}
-          <br />
-          <strong>Employees:</strong> {employees.length} records found
-        </div>
-      </div>
+      {/* Data Table */}
+      <DataTable
+        columns={tableColumns}
+        data={getTableData()}
+        loading={loading}
+        title="Employee Records"
+        searchPlaceholder="Search by name, email, phone or type..."
+        onSearch={handleTableSearch}
+        actions={renderTableActions}
+      />
 
-      {/* Table */}
-      <div className="bg-slate-800 rounded-lg p-4 overflow-x-auto">
-        {loading ? (
-          <div className="text-center py-8 text-gray-400">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-            Loading employees...
-          </div>
-        ) : employees.length === 0 ? (
-          <p className="text-gray-400 text-center py-8">No employees found.</p>
-        ) : (
-          <table className="w-full text-left">
-            <thead className="text-gray-300 border-b border-gray-700">
-              <tr>
-                <th className="py-3 px-4 font-semibold">#</th>
-                <th className="py-3 px-4 font-semibold">Name</th>
-                <th className="py-3 px-4 font-semibold">Email</th>
-                <th className="py-3 px-4 font-semibold">Phone</th>
-                <th className="py-3 px-4 font-semibold">Role</th>
-                <th className="py-3 px-4 font-semibold">School</th>
-                <th className="py-3 px-4 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map((employee, index) => (
-                <tr key={employee.id} className="border-b border-gray-700 hover:bg-slate-700/40 transition-colors">
-                  <td className="py-3 px-4">{index + 1}</td>
-                  <td className="py-3 px-4 font-medium">{employee.name}</td>
-                  <td className="py-3 px-4">{employee.email || "-"}</td>
-                  <td className="py-3 px-4">{employee.phone || "-"}</td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      employee.role === 'teacher' 
-                        ? 'bg-green-500/20 text-green-300' 
-                        : 'bg-blue-500/20 text-blue-300'
-                    }`}>
-                      {employee.role === 'teacher' ? 'Teacher' : 'Non-Teaching'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-gray-300">
-                    {employee.school?.name || "N/A"}
-                  </td>
-                  <td className="py-3 px-4 text-right space-x-3">
-                    <button
-                      onClick={() => {
-                        const schoolId = getSchoolId();
-                        setForm({
-                          name: employee.name || "",
-                          email: employee.email || "",
-                          phone: employee.phone || "",
-                          role: employee.role || "teacher",
-                          school_id: schoolId
-                        });
-                        setEditId(employee.id);
-                        setShow(true);
-                      }}
-                      className="text-yellow-400 hover:text-yellow-300 font-medium transition-colors px-2 py-1 rounded hover:bg-yellow-400/10"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(employee.id)}
-                      className="text-red-400 hover:text-red-300 font-medium transition-colors px-2 py-1 rounded hover:bg-red-400/10"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Modal */}
-      {show && (
+      {/* Modal - Add/Edit Employee */}
+      {showModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50 p-4">
           <div className="bg-slate-800 p-6 rounded-lg w-full max-w-md border border-slate-700">
             <h3 className="text-xl font-semibold mb-4">
@@ -288,49 +302,58 @@ export default function Employee() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Email
+                  Email <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  placeholder="Enter email (optional)"
+                  placeholder="Enter email address"
                   className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  required
                   disabled={saveLoading}
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  Email must be unique within your school
+                  Email will be used as username for login
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Phone
+                  Phone <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="Enter phone number (optional)"
+                  placeholder="Enter phone number"
                   className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  required
                   disabled={saveLoading}
                 />
+                <p className="text-xs text-gray-400 mt-1">
+                  Phone will be used as temporary password
+                </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Role <span className="text-red-400">*</span>
+                  Employee Type <span className="text-red-400">*</span>
                 </label>
                 <select
-                  value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value })}
+                  value={form.employee_type}
+                  onChange={(e) => setForm({ ...form, employee_type: e.target.value })}
                   className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                   required
                   disabled={saveLoading}
                 >
-                  <option value="teacher">Teacher</option>
-                  <option value="non-teaching">Non-Teaching</option>
+                  <option value="teaching">Teaching Staff</option>
+                  <option value="non_teaching">Non-Teaching Staff</option>
                 </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Teaching staff can manage classes, take attendance, and enter results.<br />
+                  Non-teaching staff can manage financial operations.
+                </p>
               </div>
 
               <div className="p-3 bg-slate-700/50 rounded text-sm">
@@ -360,6 +383,17 @@ export default function Employee() {
           </div>
         </div>
       )}
+      
+      {/* Credentials Modal */}
+      <CredentialsModal
+        isOpen={showCredentialsModal}
+        onClose={() => {
+          setShowCredentialsModal(false);
+          setNewCredentials(null);
+        }}
+        credentials={newCredentials}
+        entityType="employee"
+      />
     </div>
   );
 }

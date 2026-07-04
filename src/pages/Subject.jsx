@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api/axios";
+import DataTable from "../components/DataTable";
+import { Edit, Trash2, Plus } from "lucide-react";
 
 export default function Subject() {
   const [subjects, setSubjects] = useState([]);
@@ -10,7 +12,6 @@ export default function Subject() {
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Get school_id from user data
   const getSchoolId = () => {
     const user = JSON.parse(localStorage.getItem('user'));
     return user?.school?.id || user?.school_id;
@@ -32,7 +33,6 @@ export default function Subject() {
       
       console.log("📚 Subjects with grades:", res.data);
       
-      // Handle API response format
       const subjectsData = res.data?.data || res.data || [];
       setSubjects(subjectsData);
       
@@ -64,7 +64,6 @@ export default function Subject() {
         params: { school_id: schoolId }
       });
       
-      // Handle API response format
       setGrades(res.data?.data || res.data || []);
     } catch (error) {
       console.error("❌ Fetch grades error:", error);
@@ -178,16 +177,62 @@ export default function Subject() {
     setShowModal(true);
   };
 
+  // ========== DATATABLE CONFIGURATION ==========
+  const tableColumns = [
+    { header: "Name", accessor: "name", width: "250px" },
+    { header: "Grade", accessor: "grade_name", width: "200px" },
+    { header: "School", accessor: "school_name", width: "250px" },
+  ];
+
+  const getTableData = () => {
+    return subjects.map((subject, index) => ({
+      id: subject.id,
+      name: subject.name,
+      grade_name: getGradeName(subject),
+      school_name: subject.school?.name || "N/A",
+      original: subject,
+      index: index
+    }));
+  };
+
+  const renderActions = (row) => (
+    <div className="flex items-center justify-end gap-2">
+      <button 
+        onClick={() => handleEdit(row.original)} 
+        className="text-yellow-400 hover:text-yellow-300 p-1"
+        title="Edit"
+      >
+        <Edit className="h-4 w-4" />
+      </button>
+      <button 
+        onClick={() => handleDelete(row.original.id)} 
+        className="text-red-400 hover:text-red-300 p-1"
+        title="Delete"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
+  const handleTableSearch = (data, term) => {
+    const lowerTerm = term.toLowerCase();
+    return data.filter(item => 
+      item.name?.toLowerCase().includes(lowerTerm) ||
+      item.grade_name?.toLowerCase().includes(lowerTerm)
+    );
+  };
+
   return (
     <div className="text-white">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Subjects</h2>
         <button 
           onClick={handleOpenModal} 
-          className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-400"
+          className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-400 flex items-center gap-2"
           disabled={loading}
         >
-          + Add Subject
+          <Plus className="h-4 w-4" />
+          Add Subject
         </button>
       </div>
 
@@ -200,60 +245,18 @@ export default function Subject() {
         </div>
       </div>
 
-      <div className="bg-slate-800 rounded-lg p-4">
-        {loading ? (
-          <div className="text-center py-4">Loading subjects...</div>
-        ) : (
-          <table className="w-full text-left">
-            <thead className="text-gray-300 border-b border-gray-700">
-              <tr>
-                <th className="py-2 px-3">#</th>
-                <th className="py-2 px-3">Name</th>
-                <th className="py-2 px-3">Grade</th>
-                <th className="py-2 px-3">School</th>
-                <th className="py-2 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {subjects.length > 0 ? (
-                subjects.map((subject, i) => (
-                  <tr key={subject.id} className="border-b border-gray-700 hover:bg-slate-700/40">
-                    <td className="py-2 px-3">{i + 1}</td>
-                    <td className="py-2 px-3 font-medium">{subject.name}</td>
-                    <td className="py-2 px-3 text-gray-300">
-                      {getGradeName(subject)}
-                    </td>
-                    <td className="py-2 px-3 text-gray-300">
-                      {subject.school?.name || "N/A"}
-                    </td>
-                    <td className="py-2 px-3 text-right space-x-3">
-                      <button 
-                        onClick={() => handleEdit(subject)} 
-                        className="text-yellow-400 hover:text-yellow-300 font-medium"
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(subject.id)} 
-                        className="text-red-400 hover:text-red-300 font-medium"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="5" className="text-center py-8 text-gray-400">
-                    No subjects found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Data Table */}
+      <DataTable
+        columns={tableColumns}
+        data={getTableData()}
+        loading={loading}
+        title="Subject Records"
+        searchPlaceholder="Search by subject name or grade..."
+        onSearch={handleTableSearch}
+        actions={renderActions}
+      />
 
+      {/* Modal - Add/Edit Subject */}
       {showModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50">
           <div className="bg-slate-800 p-6 rounded-lg w-96 border border-slate-700">

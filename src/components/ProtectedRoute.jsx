@@ -70,20 +70,41 @@ export default function ProtectedRoute({ children, requiredRole, requireSubscrip
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
 
   // Role authorization check
-  if (requiredRole && user.role !== normalizeRole(requiredRole)) {
-    switch (user.role) {
-      case "super_admin":
-        return <Navigate to="/super-admin/dashboard" replace />;
-      case "admin":
-        return <Navigate to="/admin/dashboard" replace />;
-      default:
-        return <Navigate to="/" replace />;
-    }
-  }
+  // In ProtectedRoute.jsx - update the role authorization check section
 
+// Role authorization check
+// In ProtectedRoute.jsx - replace the role authorization check section
+
+// Role authorization check
+if (requiredRole && user.role !== normalizeRole(requiredRole)) {
+  // Redirect to appropriate dashboard based on user's actual role
+  switch (user.role) {
+    case "super_admin":
+      return <Navigate to="/super-admin/dashboard" replace />;
+    case "admin":
+      // Check if school is unlocked to determine where to redirect
+      if (user.school?.is_unlocked) {
+        return <Navigate to="/school/dashboard" replace />;
+      } else {
+        return <Navigate to="/school/subscriptions" replace />;
+      }
+    case "employee":
+      if (user.employee_type === 'teaching') {
+        return <Navigate to="/employee/dashboard" replace />;
+      } else {
+        return <Navigate to="/account/dashboard" replace />;
+      }
+    case "student":
+      return <Navigate to="/student/dashboard" replace />;
+    case "parent":
+      return <Navigate to="/parent/dashboard" replace />;
+    default:
+      return <Navigate to="/" replace />;
+  }
+}
   // Subscription check for admin
   if (requireSubscription && user.role === "admin" && !subscriptionStatus?.has_active_subscription) {
-    return <Navigate to="/admin/subscriptions" replace />;
+    return <Navigate to="/school/subscriptions" replace />;
   }
 
   // Access granted

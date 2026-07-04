@@ -1,16 +1,23 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api/axios";
+import CredentialsModal from "../components/CredentialsModal";
+import DataTable from "../components/DataTable";
+import { Edit, Trash2, Plus } from "lucide-react";
 
 export default function Student() {
   const [students, setStudents] = useState([]);
   const [grades, setGrades] = useState([]);
   const [parents, setParents] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [newCredentials, setNewCredentials] = useState(null);
+
   const [form, setForm] = useState({
     name: "",
     admission_number: "",
     roll_number: "",
+    phone: "",
     grade_id: "",
     parent_id: "",
     gender: "",
@@ -44,25 +51,13 @@ export default function Student() {
         api.get("/parents", { params: { school_id: schoolId } }).catch(() => ({ data: { data: [] } }))
       ]);
       
-      // Handle API response format
       setStudents(studentsRes.data?.data || studentsRes.data || []);
       setGrades(gradesRes.data?.data || gradesRes.data || []);
       setParents(parentsRes.data?.data || parentsRes.data || []);
       
-      console.log("📊 Loaded data:", {
-        students: students.length,
-        grades: grades.length,
-        parents: parents.length
-      });
-      
     } catch (err) {
       console.error("❌ Fetch error:", err);
-      
-      if (err.response?.status === 422) {
-        toast.error("School ID is required. Please refresh and try again.");
-      } else {
-        toast.error("Failed to fetch data");
-      }
+      toast.error("Failed to fetch data");
     } finally {
       setLoading(false);
     }
@@ -92,15 +87,22 @@ export default function Student() {
         parents_id: form.parent_id,
         gender: form.gender,
         email: form.email,
+        phone: form.phone,
         school_id: schoolId
       };
 
+      let response;
       if (editId) {
         await api.put(`/students/${editId}`, payload);
         toast.success("Student updated successfully");
       } else {
-        await api.post("/students", payload);
+        response = await api.post("/students", payload);
         toast.success("Student added successfully");
+        
+        if (response.data.credentials) {
+          setNewCredentials(response.data.credentials);
+          setShowCredentialsModal(true);
+        }
       }
       
       setShowModal(false);
@@ -136,6 +138,7 @@ export default function Student() {
       parent_id: student.parents_id || student.parent_id || "",
       gender: student.gender || "",
       email: student.email || "",
+      phone: student.phone || "",
       school_id: schoolId
     });
     setEditId(student.id);
@@ -191,6 +194,7 @@ export default function Student() {
       parent_id: "",
       gender: "",
       email: "",
+      phone: "",
       school_id: schoolId
     });
     setEditId(null);
@@ -218,125 +222,88 @@ export default function Student() {
     setShowModal(true);
   };
 
+  // ========== DATATABLE CONFIGURATION ==========
+  const tableColumns = [
+    { header: "#", accessor: "index", width: "50px" },
+    { header: "Admission No", accessor: "admission_number", width: "150px" },
+    { header: "Name", accessor: "name", width: "200px" },
+    { header: "Phone", accessor: "phone", width: "150px" },
+    { header: "Grade", accessor: "grade_name", width: "120px" },
+    { header: "Parent", accessor: "parent_name", width: "180px" },
+    { header: "Gender", accessor: "gender", width: "100px" },
+    { header: "Email", accessor: "email", width: "200px" },
+  ];
+
+  const getTableData = () => {
+    return students.map((student, index) => ({
+      id: student.id,
+      index: index + 1,
+      admission_number: student.admission_number || "N/A",
+      name: student.name,
+      phone: student.phone || "N/A",
+      grade_name: getGradeName(student),
+      parent_name: getParentName(student),
+      gender: student.gender || "N/A",
+      email: student.email || "N/A",
+      original: student
+    }));
+  };
+
+  const renderTableActions = (row) => (
+    <div className="flex items-center justify-end gap-2">
+      <button
+        onClick={() => handleEdit(row.original)}
+        className="text-yellow-400 hover:text-yellow-300 p-1"
+        title="Edit"
+      >
+        <Edit className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => handleDelete(row.original.id)}
+        className="text-red-400 hover:text-red-300 p-1"
+        title="Delete"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
+  const handleTableSearch = (data, term) => {
+    const lowerTerm = term.toLowerCase();
+    return data.filter(item => 
+      item.name?.toLowerCase().includes(lowerTerm) ||
+      item.admission_number?.toLowerCase().includes(lowerTerm) ||
+      item.parent_name?.toLowerCase().includes(lowerTerm) ||
+      item.email?.toLowerCase().includes(lowerTerm)
+    );
+  };
+
   return (
     <div className="text-white p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Students</h2>
         <button
           onClick={handleOpenModal}
-          className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition-colors font-medium"
+          className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition-colors font-medium flex items-center gap-2"
           disabled={loading}
         >
-          {loading ? "Loading..." : "+ Add Student"}
+          <Plus className="h-4 w-4" />
+          {loading ? "Loading..." : "Add Student"}
         </button>
       </div>
 
-      {/* Debug Info */}
-      <div className="mb-4 p-3 bg-slate-800 rounded text-sm">
-        <div className="text-gray-300">
-          <strong>School ID:</strong> {getSchoolId() || "Not found"}
-          <br />
-          <strong>Students:</strong> {students.length} records found
-        </div>
-      </div>
-
       {/* Data Table */}
-      <div className="bg-slate-800 rounded-lg p-4 overflow-x-auto">
-        {loading ? (
-          <div className="text-center py-8 text-gray-400">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-            Loading students...
-          </div>
-        ) : (
-          <table className="w-full text-left">
-            <thead className="text-gray-300 border-b border-gray-700">
-              <tr>
-                <th className="py-3 px-4 font-semibold">#</th>
-                <th className="py-3 px-4 font-semibold">Name</th>
-                <th className="py-3 px-4 font-semibold">Admission No</th>
-                <th className="py-3 px-4 font-semibold">Roll No</th>
-                <th className="py-3 px-4 font-semibold">Grade</th>
-                <th className="py-3 px-4 font-semibold">Parent</th>
-                <th className="py-3 px-4 font-semibold">Gender</th>
-                <th className="py-3 px-4 font-semibold">Email</th>
-                <th className="py-3 px-4 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.length > 0 ? (
-                students.map((student, index) => (
-                  <tr key={student.id} className="border-b border-gray-700 hover:bg-slate-700/40 transition-colors">
-                    <td className="py-3 px-4">{index + 1}</td>
-                    <td className="py-3 px-4 font-medium">{student.name}</td>
-                    <td className="py-3 px-4 font-mono text-sm text-blue-300">
-                      {student.admission_number}
-                    </td>
-                    <td className="py-3 px-4">{student.roll_number || "N/A"}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        student.grade_id ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'
-                      }`}>
-                        {getGradeName(student)}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        (student.parents_id || student.parent_id) ? 'bg-blue-500/20 text-blue-300' : 'bg-yellow-500/20 text-yellow-300'
-                      }`}>
-                        {getParentName(student)}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        student.gender === 'Male' 
-                          ? 'bg-blue-500/20 text-blue-300' 
-                          : student.gender === 'Female'
-                          ? 'bg-pink-500/20 text-pink-300'
-                          : 'bg-gray-500/20 text-gray-300'
-                      }`}>
-                        {student.gender || "N/A"}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-sm">
-                      {student.email ? (
-                        <a href={`mailto:${student.email}`} className="text-blue-300 hover:text-blue-200 hover:underline">
-                          {student.email}
-                        </a>
-                      ) : (
-                        "N/A"
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-right space-x-3">
-                      <button
-                        onClick={() => handleEdit(student)}
-                        className="text-yellow-400 hover:text-yellow-300 font-medium transition-colors px-2 py-1 rounded hover:bg-yellow-400/10"
-                        title="Edit student"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(student.id)}
-                        className="text-red-400 hover:text-red-300 font-medium transition-colors px-2 py-1 rounded hover:bg-red-400/10"
-                        title="Delete student"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="9" className="text-center py-8 text-gray-400">
-                    No students found. {!loading && "Click 'Add Student' to create one."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <DataTable
+        columns={tableColumns}
+        data={getTableData()}
+        loading={loading}
+        title="Student Records"
+        searchPlaceholder="Search by name, admission number, parent or email..."
+        onSearch={handleTableSearch}
+        actions={renderTableActions}
+      />
 
-      {/* Modal */}
+      {/* Modal - Add/Edit Student */}
       {showModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50 p-4">
           <div className="bg-slate-800 p-6 rounded-lg w-full max-w-md border border-slate-700 max-h-[90vh] overflow-y-auto">
@@ -392,19 +359,38 @@ export default function Student() {
                   disabled={saveLoading}
                 />
               </div>
+                
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Phone Number <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter phone number"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  required
+                  disabled={saveLoading}
+                />
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Email
+                  Email <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="email"
-                  placeholder="Enter email address (optional)"
+                  placeholder="Enter email address"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  required
                   disabled={saveLoading}
                 />
+                <p className="text-xs text-gray-400 mt-1">
+                  This will be used as username for login
+                </p>
               </div>
 
               <div>
@@ -462,9 +448,9 @@ export default function Student() {
                   disabled={saveLoading}
                 >
                   <option value="">Select Gender (Optional)</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
 
@@ -489,6 +475,17 @@ export default function Student() {
           </div>
         </div>
       )}
+
+      {/* Credentials Modal */}
+      <CredentialsModal
+        isOpen={showCredentialsModal}
+        onClose={() => {
+          setShowCredentialsModal(false);
+          setNewCredentials(null);
+        }}
+        credentials={newCredentials}
+        entityType="student"
+      />
     </div>
   );
 }

@@ -9,12 +9,19 @@ import {
   Users,
   Bell,
   TrendingUp,
-  Clock
+  Clock,
+  LogOut,
+  Phone,
+  Video
 } from 'lucide-react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
+import MessagingComponent from '../components/Chat/MessagingComponent';
+import WhatsAppMessaging from '../components/WhatsApp/WhatsAppMessaging';
 
 export default function StudentDashboard() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState({
@@ -23,6 +30,20 @@ export default function StudentDashboard() {
     averageGrade: 0,
     feeBalance: 0
   });
+  
+  // State for modals
+  const [showChat, setShowChat] = useState(false);
+  const [showWhatsApp, setShowWhatsApp] = useState(false);
+  const [selectedConversation, setSelectedConversation] = useState(null);
+
+  // Logout function
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    delete api.defaults.headers.common["Authorization"];
+    navigate("/login", { replace: true });
+    toast.success("Logged out successfully");
+  };
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -109,11 +130,41 @@ export default function StudentDashboard() {
               </p>
             </div>
             <div className="flex items-center space-x-4">
+              {/* Chat Button */}
+              <button
+                onClick={() => setShowChat(true)}
+                className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+                title="Chat"
+              >
+                <Users className="h-5 w-5 text-gray-300" />
+              </button>
+              
+              {/* WhatsApp Button */}
+              <button
+                onClick={() => setShowWhatsApp(true)}
+                className="p-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+                title="WhatsApp"
+              >
+                <Phone className="h-5 w-5 text-white" />
+              </button>
+              
+              {/* Badge */}
               <div className="bg-blue-500/20 border border-blue-500/30 px-4 py-2 rounded-lg">
                 <p className="text-blue-300 font-medium">Student</p>
               </div>
+              
+              {/* Notifications */}
               <button className="p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors">
                 <Bell className="h-5 w-5 text-gray-300" />
+              </button>
+              
+              {/* Logout Button */}
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Logout</span>
               </button>
             </div>
           </div>
@@ -227,6 +278,17 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      {showChat && (
+        <MessagingComponent
+          conversationId={selectedConversation}
+          onClose={() => setShowChat(false)}
+        />
+      )}
+      {showWhatsApp && (
+        <WhatsAppMessaging onClose={() => setShowWhatsApp(false)} />
+      )}
     </div>
   );
 }

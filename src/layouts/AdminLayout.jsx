@@ -7,7 +7,6 @@ export default function AdminLayout() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Quick check to ensure we have the necessary data
     const token = localStorage.getItem('token');
     const user = localStorage.getItem('user');
     
@@ -15,7 +14,6 @@ export default function AdminLayout() {
     console.log('   Token:', token ? 'Exists' : 'Missing');
     console.log('   User:', user);
     
-    // Small delay to ensure everything is loaded
     const timer = setTimeout(() => {
       setLoading(false);
     }, 100);
@@ -35,12 +33,10 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-900 text-white overflow-hidden">
+    <div className="flex h-screen w-screen bg-slate-900 text-white overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-auto bg-slate-900">
-        <div className="p-6">
-          <Outlet />
-        </div>
+        <Outlet />
       </main>
     </div>
   );

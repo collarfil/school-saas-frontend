@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
 
 /* =======================
    LAYOUTS
@@ -11,6 +11,13 @@ import SuperAdminLayout from "../layouts/SuperAdminLayout";
    ROUTE GUARD
 ======================= */
 import ProtectedRoute from "../components/ProtectedRoute";
+
+/* =======================
+  FORGOT PASSWORD & RESET
+  =======================*/
+import ForgotPassword from "../pages/ForgotPassword";
+import ResetPassword from "../pages/ResetPassword";
+
 
 /* =======================
    PUBLIC PAGES
@@ -76,6 +83,14 @@ import SuperAdminUserRegister from "../pages/SuperAdminUserRegister";
    404
 ======================= */
 import NotFound from "../pages/NotFound";
+/* ======================
+  REPORTS
+  =======================*/
+import StudentReport from "../pages/reports/StudentReport";
+import FeeReceipts from "../pages/reports/FeeReceipts";
+import IncomeExpenditure from "../pages/reports/IncomeExpenditure";
+import AcademicReport from "../pages/reports/AcademicReport";
+import EmployeesReport from "../pages/reports/EmployeesReport";
 
 /* =======================
    SCHOOL ROUTES LIST
@@ -111,15 +126,32 @@ const router = createBrowserRouter(
       children: [
         { path: "/", element: <Home /> },
         { path: "/login", element: <Login /> },
+        { path: "/forgot-password", element: <ForgotPassword /> },
+        { path: "/reset-password", element: <ResetPassword /> },
         { path: "/register/super-admin", element: <SuperAdminRegister /> },
+        
+        
+      
 
         // Paystack callbacks
         { path: "/payment/callback", element: <PaymentCallback /> },
         { path: "/payment/success", element: <PaymentSuccess /> },
         { path: "/subscription/callback", element: <PaymentCallback /> },
-        { path: "/subscription/success", element: <PaymentCallback /> },
+        { path: "/subscription/success", element: <PaymentSuccess /> },
       ],
     },
+
+    // In AppRouter.jsx - add this after the public routes and before force password change
+
+      /* ---------- REDIRECTS (Catch old admin paths) ---------- */
+      {
+        path: "/admin",
+        element: <Navigate to="/school/dashboard" replace />,
+      },
+      {
+        path: "/admin/*",
+        element: <Navigate to="/school/dashboard" replace />,
+      },
 
     /* ---------- FORCE PASSWORD CHANGE ---------- */
     {
@@ -143,6 +175,46 @@ const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
+         {
+          path: "/school/reports/student-results",
+          element: (
+            <ProtectedRoute requiredRole="admin" requireSubscription>
+              <StudentReport />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/school/reports/fee-receipts",
+          element: (
+            <ProtectedRoute requiredRole="admin" requireSubscription>
+              <FeeReceipts />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/school/reports/income-expenditure",
+          element: (
+            <ProtectedRoute requiredRole="admin" requireSubscription>
+              <IncomeExpenditure />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/school/reports/academic",
+          element: (
+            <ProtectedRoute requiredRole="admin" requireSubscription>
+              <AcademicReport />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/school/reports/employees",
+          element: (
+            <ProtectedRoute requiredRole="admin" requireSubscription>
+              <EmployeesReport />
+            </ProtectedRoute>
+          ),
+    },
         {
           path: "/school/subscriptions",
           element: (

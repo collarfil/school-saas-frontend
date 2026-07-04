@@ -361,66 +361,64 @@ const redirectToDashboard = (userData) => {
   };
 
   // Start payment polling
-  const startPaymentPolling = (reference) => {
-    // Clear existing interval
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-    }
+ // In Subscription.jsx - update the payment polling success handler
 
-    let pollCount = 0;
-    const maxPolls = 60; // 5 minutes (5 seconds * 60)
+const startPaymentPolling = (reference) => {
+  // Clear existing interval
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+  }
+
+  let pollCount = 0;
+  const maxPolls = 60; // 5 minutes (5 seconds * 60)
+  
+  const interval = setInterval(async () => {
+    pollCount++;
     
-    const interval = setInterval(async () => {
-      pollCount++;
+    if (pollCount > maxPolls) {
+      clearInterval(interval);
+      localStorage.removeItem('pending_payment_reference');
+      toast.error('Payment verification timeout');
+      return;
+    }
+    
+    try {
+      // Verify payment - FIXED ENDPOINT
+      const verifyResponse = await api.post('/subscriptions/verify', { reference });
       
-      if (pollCount > maxPolls) {
+      if (verifyResponse.data.status === 'success') {
         clearInterval(interval);
         localStorage.removeItem('pending_payment_reference');
-        toast.error('Payment verification timeout');
-        return;
-      }
-      
-      try {
-        // Verify payment
-        const verifyResponse = await api.post('/payments/verify', { reference });
         
-        if (verifyResponse.data.status === 'success') {
-          const paymentData = verifyResponse.data.data;
-          
-          if (paymentData.status === 'success' || paymentData.status === 'paid') {
-            clearInterval(interval);
-            localStorage.removeItem('pending_payment_reference');
-            
-            toast.success('Payment completed successfully!');
-            
-            // Update subscription status
-            await checkSubscriptionStatus();
-            
-            // Get updated user data
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            
-            // Redirect to dashboard after short delay
-            setTimeout(() => {
-              redirectToDashboard(user);
-            }, 1500);
-            
-            // Refresh all data
-            loadAllData();
-            
-          } else if (paymentData.status === 'failed') {
-            clearInterval(interval);
-            localStorage.removeItem('pending_payment_reference');
-            toast.error('Payment failed. Please try again.');
-          }
-        }
-      } catch (err) {
-        console.error('Polling error:', err);
-        // Continue polling on errors
+        toast.success('Payment completed successfully!');
+        
+        // Update subscription status
+        await checkSubscriptionStatus();
+        
+        // Get updated user data
+        const updatedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        
+        // Redirect to dashboard after short delay
+        setTimeout(() => {
+          redirectToDashboard(updatedUser);
+        }, 2000);
+        
+        // Refresh all data
+        loadAllData();
+        
+      } else if (verifyResponse.data.status === 'failed') {
+        clearInterval(interval);
+        localStorage.removeItem('pending_payment_reference');
+        toast.error('Payment failed. Please try again.');
       }
-    }, 5000); // Poll every 5 seconds
+    } catch (err) {
+      console.error('Polling error:', err);
+      // Continue polling on errors
+    }
+  }, 5000); // Poll every 5 seconds
 
-    setPollingInterval(interval);
-  };
+  setPollingInterval(interval);
+};
 
   const handleCompletePayment = async (subscription) => {
     if (!subscription.payment_reference) {

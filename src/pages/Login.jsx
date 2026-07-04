@@ -13,7 +13,7 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setLoading(true); 
     setError("");
 
     if (!form.email || !form.password) {
@@ -22,37 +22,66 @@ export default function Login() {
       return;
     }
 
-    try {
-      const res = await api.post("/auth/login", form);
+    // In Login.jsx - update the navigation part after successful login
 
-      const token = res.data.access_token;
-      const user = res.data.user;
-      const defaultDashboard = res.data.default_dashboard;
+try {
+  const res = await api.post("/auth/login", form); // Note: added /v1 prefix
+  
+  const token = res.data.access_token;
+  const user = res.data.user;
+  const defaultDashboard = res.data.default_dashboard;
 
-      if (!token || !user) throw new Error("Invalid login response");
+  if (!token || !user) throw new Error("Invalid login response");
 
-      // Save token and user to localStorage
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
-      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  // Save token and user to localStorage
+  localStorage.setItem("token", token);
+  localStorage.setItem("user", JSON.stringify(user));
+  api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-      toast.success("Login successful!");
+  toast.success("Login successful!");
 
-      // STEP 1: Redirect to change-password if required
-      if (user.must_change_password) {
-        console.log("🔐 Password change required");
-        navigate("/change-password", { replace: true });
-        return;
+  // STEP 1: Redirect to change-password if required
+  if (user.must_change_password) {
+    console.log("🔐 Password change required");
+    navigate("/change-password", { replace: true });
+    return;
+  }
+
+  // STEP 2: Map backend dashboard routes to frontend routes
+      let frontendRoute = defaultDashboard;
+
+      // Fix route mapping for super admin
+      if (user.role === 'super_admin') {
+          frontendRoute = '/super-admin/dashboard';
+      } 
+      // School admin - check subscription status
+      else if (user.role === 'admin') {
+          // Check if school is unlocked (has active subscription)
+          if (user.school?.is_unlocked) {
+              frontendRoute = '/school/dashboard';
+          } else {
+              frontendRoute = '/school/subscriptions';  // Send to payment page
+          }
+      }
+      // Employee dashboard
+      else if (user.role === 'employee') {
+          if (user.employee_type === 'teaching') {
+              frontendRoute = '/employee/dashboard';
+          } else if (user.employee_type === 'account') {
+              frontendRoute = '/account/dashboard';
+          }
+      }
+      // Student dashboard
+      else if (user.role === 'student') {
+          frontendRoute = '/student/dashboard';
+      }
+      // Parent dashboard
+      else if (user.role === 'parent') {
+          frontendRoute = '/parent/dashboard';
       }
 
-      // STEP 2: Redirect to backend-provided dashboard route
-      if (defaultDashboard) {
-        console.log(`👤 Redirecting to dashboard: ${defaultDashboard}`);
-        navigate(defaultDashboard, { replace: true });
-      } else {
-        console.warn("⚠️ No dashboard route provided, redirecting to fallback");
-        navigate("/dashboard", { replace: true });
-      }
+      console.log(`👤 User role: ${user.role}, School unlocked: ${user.school?.is_unlocked}, Redirecting to: ${frontendRoute}`);
+      navigate(frontendRoute, { replace: true });
 
     } catch (err) {
       console.error("Login error:", err.response || err);
@@ -177,7 +206,16 @@ export default function Login() {
               )}
             </button>
           </form>
-
+           // Add this after the login button, before the create super admin section
+          <div className="text-right mt-2">
+          <button
+            type="button"
+            onClick={() => navigate("/forgot-password")}
+            className="text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
+          >
+            Forgot Password?
+          </button>
+        </div>
           <div className="mt-6 pt-4 border-t border-slate-600">
             <p className="text-sm text-gray-400 text-center">
               Setting up the system for the first time?{" "}
@@ -190,7 +228,9 @@ export default function Login() {
             </p>
           </div>
         </div>
+       
       </div>
     </div>
+    
   );
 }
