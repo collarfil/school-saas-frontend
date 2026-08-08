@@ -25,7 +25,9 @@ export default function Login() {
     // In Login.jsx - update the navigation part after successful login
 
 try {
-  const res = await api.post("/auth/login", form); // Note: added /v1 prefix
+  // In Login.jsx - update the API call
+// Remove /v1 from the endpoint string - use relative pathing from baseURL
+const res = await api.post("/auth/login", form);
   
   const token = res.data.access_token;
   const user = res.data.user;
@@ -107,7 +109,9 @@ try {
       admin: { email: "admin@school.com", password: "password" },
     };
     setForm(demo[role]);
-    toast.info(`Demo ${role.replace("_", " ")} credentials loaded`);
+    toast(`Demo ${role.replace("_", " ")} credentials loaded`, {
+  icon: 'ℹ️',
+  });
   };
 
   return (
@@ -204,9 +208,10 @@ try {
               ) : (
                 <span>Login to Dashboard</span>
               )}
-            </button>
+          {/* GOOD (Fixed code): Properly wrapped React comment */}
+          </button>
           </form>
-           // Add this after the login button, before the create super admin section
+          {/* Add this after the login button, before the create super admin section */}
           <div className="text-right mt-2">
           <button
             type="button"
@@ -234,3 +239,5 @@ try {
     
   );
 }
+
+

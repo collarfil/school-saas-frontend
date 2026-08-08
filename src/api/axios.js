@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api/v1', // ✅ Fixed: Added /v1
+  baseURL: 'http://localhost:8000/api/v1', // Make sure /api/ is present!
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
