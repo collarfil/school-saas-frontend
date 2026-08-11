@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import toast from "react-hot-toast";
 import api from "../api/axios";
 import CredentialsModal from "../components/CredentialsModal";
 import DataTable from "../components/DataTable";
-import { Edit, Trash2, Plus } from "lucide-react";
+import { Edit, Trash2, Plus, Search, ChevronDown, Check, X } from "lucide-react";
 
 export default function Student() {
   const [students, setStudents] = useState([]);
@@ -12,6 +12,11 @@ export default function Student() {
   const [showModal, setShowModal] = useState(false);
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [newCredentials, setNewCredentials] = useState(null);
+
+  // Searchable Parent Dropdown States
+  const [parentSearch, setParentSearch] = useState("");
+  const [isParentDropdownOpen, setIsParentDropdownOpen] = useState(false);
+  const parentDropdownRef = useRef(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -28,7 +33,6 @@ export default function Student() {
   const [loading, setLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
 
-  // Get school_id from user data
   const getSchoolId = () => {
     const user = JSON.parse(localStorage.getItem('user'));
     return user?.school?.id || user?.school_id;
@@ -67,6 +71,17 @@ export default function Student() {
     fetchAll();
   }, []);
 
+  // Close parent searchable dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (parentDropdownRef.current && !parentDropdownRef.current.contains(event.target)) {
+        setIsParentDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaveLoading(true);
@@ -99,7 +114,7 @@ export default function Student() {
         response = await api.post("/students", payload);
         toast.success("Student added successfully");
         
-        if (response.data.credentials) {
+        if (response.data?.credentials) {
           setNewCredentials(response.data.credentials);
           setShowCredentialsModal(true);
         }
@@ -130,12 +145,13 @@ export default function Student() {
 
   const handleEdit = (student) => {
     const schoolId = getSchoolId();
+    const parentId = student.parents_id || student.parent_id || "";
     setForm({
       name: student.name || "",
       admission_number: student.admission_number || "",
       roll_number: student.roll_number || "",
       grade_id: student.grade_id || "",
-      parent_id: student.parents_id || student.parent_id || "",
+      parent_id: parentId,
       gender: student.gender || "",
       email: student.email || "",
       phone: student.phone || "",
@@ -162,9 +178,8 @@ export default function Student() {
   };
 
   const getGradeName = (student) => {
-    if (student.grade && student.grade.name) {
-      return student.grade.name;
-    }
+    if (student.grade_name) return student.grade_name;
+    if (student.grade && student.grade.name) return student.grade.name;
     if (student.grade_id) {
       const grade = grades.find(g => g.id === student.grade_id);
       return grade ? grade.name : `Grade ${student.grade_id}`;
@@ -173,9 +188,8 @@ export default function Student() {
   };
 
   const getParentName = (student) => {
-    if (student.parent && student.parent.name) {
-      return student.parent.name;
-    }
+    if (student.parent_name && student.parent_name !== 'No Parent') return student.parent_name;
+    if (student.parent && student.parent.name) return student.parent.name;
     const parentId = student.parents_id || student.parent_id;
     if (parentId) {
       const parent = parents.find(p => p.id === parentId);
@@ -197,6 +211,7 @@ export default function Student() {
       phone: "",
       school_id: schoolId
     });
+    setParentSearch("");
     setEditId(null);
   };
 
@@ -221,6 +236,15 @@ export default function Student() {
     setEditId(null);
     setShowModal(true);
   };
+
+  // Helper to get selected parent object
+  const selectedParent = parents.find(p => p.id === form.parent_id);
+
+  // Filter parents for searchable select
+  const filteredParents = parents.filter(parent => 
+    parent.name?.toLowerCase().includes(parentSearch.toLowerCase()) ||
+    parent.phone?.includes(parentSearch)
+  );
 
   // ========== DATATABLE CONFIGURATION ==========
   const tableColumns = [
@@ -388,9 +412,6 @@ export default function Student() {
                   required
                   disabled={saveLoading}
                 />
-                <p className="text-xs text-gray-400 mt-1">
-                  This will be used as username for login
-                </p>
               </div>
 
               <div>
@@ -413,23 +434,94 @@ export default function Student() {
                 </select>
               </div>
 
-              <div>
+              {/* SEARCHABLE PARENT DROPDOWN */}
+              <div className="relative" ref={parentDropdownRef}>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
                   Parent
                 </label>
-                <select
-                  value={form.parent_id}
-                  onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                  disabled={saveLoading}
+                <div 
+                  onClick={() => !saveLoading && setIsParentDropdownOpen(!isParentDropdownOpen)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white flex items-center justify-between cursor-pointer hover:border-slate-500 transition-colors"
                 >
-                  <option value="">Select Parent (Optional)</option>
-                  {parents.map((parent) => (
-                    <option key={parent.id} value={parent.id}>
-                      {parent.name} {parent.phone ? `(${parent.phone})` : ''}
-                    </option>
-                  ))}
-                </select>
+                  <span className={selectedParent ? "text-white" : "text-gray-400"}>
+                    {selectedParent 
+                      ? `${selectedParent.name} ${selectedParent.phone ? `(${selectedParent.phone})` : ''}`
+                      : "Select Parent (Optional)"}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {form.parent_id && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setForm({ ...form, parent_id: "" });
+                        }}
+                        className="text-gray-400 hover:text-white p-0.5"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                  </div>
+                </div>
+
+                {/* Dropdown Menu */}
+                {isParentDropdownOpen && (
+                  <div className="absolute z-50 mt-1 w-full bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    <div className="p-2 sticky top-0 bg-slate-800 border-b border-slate-700">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search parent by name or phone..."
+                          value={parentSearch}
+                          onChange={(e) => setParentSearch(e.target.value)}
+                          className="w-full bg-slate-700 border border-slate-600 rounded pl-8 pr-3 py-1.5 text-sm text-white placeholder-gray-400 outline-none focus:border-blue-500"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+
+                    <div className="py-1">
+                      <div
+                        onClick={() => {
+                          setForm({ ...form, parent_id: "" });
+                          setIsParentDropdownOpen(false);
+                          setParentSearch("");
+                        }}
+                        className="px-3 py-2 hover:bg-slate-700 cursor-pointer text-sm text-gray-400 flex items-center justify-between"
+                      >
+                        <span>None (Optional)</span>
+                        {!form.parent_id && <Check className="h-4 w-4 text-blue-400" />}
+                      </div>
+
+                      {filteredParents.length > 0 ? (
+                        filteredParents.map((parent) => (
+                          <div
+                            key={parent.id}
+                            onClick={() => {
+                              setForm({ ...form, parent_id: parent.id });
+                              setIsParentDropdownOpen(false);
+                              setParentSearch("");
+                            }}
+                            className="px-3 py-2 hover:bg-slate-700 cursor-pointer text-sm text-white flex items-center justify-between"
+                          >
+                            <div>
+                              <p className="font-medium">{parent.name}</p>
+                              {parent.phone && <p className="text-xs text-gray-400">{parent.phone}</p>}
+                            </div>
+                            {form.parent_id === parent.id && <Check className="h-4 w-4 text-blue-400" />}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-3 py-3 text-center text-sm text-gray-400">
+                          No parents found
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {parents.length === 0 && (
                   <p className="text-yellow-400 text-xs mt-1">
                     No parents available. You can add parents later.

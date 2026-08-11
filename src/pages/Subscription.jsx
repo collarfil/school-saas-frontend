@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
@@ -46,35 +46,26 @@ export default function Subscription() {
   const [showExpiredModal, setShowExpiredModal] = useState(false);
   const [expiredSubscription, setExpiredSubscription] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
+  
+  // Add refs to prevent infinite loops
+  const hasInitialized = useRef(false);
+  const isMounted = useRef(true);
 
-  // Load user data
+  // Load user data - only once
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
     setUser(storedUser);
+    isMounted.current = true;
     
-    // Check if user should be redirected (if already subscribed)
-    checkAndRedirect(storedUser);
-  }, [navigate]);
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
-  // Check if user should be redirected to dashboard
-  const checkAndRedirect = async (userData) => {
-    if (!userData?.id) return;
-    
-    try {
-      const response = await api.get('/subscriptions/status/check');
-      
-      if (response.data.has_active_subscription && response.data.school_unlocked) {
-        // User has active subscription, redirect to appropriate dashboard
-        redirectToDashboard(userData);
-      }
-    } catch (err) {
-      console.log('Redirect check failed:', err);
-    }
-  };
-
-  // Main data loading effect
+  // Main data loading effect - only runs when user is set and not initialized
   useEffect(() => {
-    if (user?.school?.id) {
+    if (user?.school?.id && !hasInitialized.current) {
+      hasInitialized.current = true;
       loadAllData();
       checkPendingPayments();
     }
@@ -86,7 +77,7 @@ export default function Subscription() {
         setPollingInterval(null);
       }
     };
-  }, [user]);
+  }, [user]); // Only depends on user
 
   // Check for pending payments in localStorage
   const checkPendingPayments = () => {
@@ -98,6 +89,8 @@ export default function Subscription() {
   };
 
   const loadAllData = async () => {
+    if (!isMounted.current) return;
+    
     setLoading(true);
     try {
       await Promise.all([
@@ -109,7 +102,9 @@ export default function Subscription() {
       console.error('Error loading subscription data:', error);
       toast.error('Failed to load subscription data');
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -117,6 +112,8 @@ export default function Subscription() {
     try {
       const res = await api.get('/subscriptions');
       console.log('Subscriptions loaded:', res.data);
+      
+      if (!isMounted.current) return;
       
       if (res.data.status === 'success' && res.data.data) {
         const subscriptionData = Array.isArray(res.data.data) 
@@ -139,7 +136,9 @@ export default function Subscription() {
       console.error('Failed to load subscriptions:', err);
       if (err.response?.status === 402) {
         // Payment required - normal for new users
-        setSubscriptions([]);
+        if (isMounted.current) {
+          setSubscriptions([]);
+        }
       }
     }
   };
@@ -149,6 +148,8 @@ export default function Subscription() {
     try {
       const res = await api.get('/subscriptions/status/check');
       console.log('Subscription status:', res.data);
+      
+      if (!isMounted.current) return;
       
       if (res.data) {
         const statusData = res.data.data || res.data;
@@ -170,14 +171,19 @@ export default function Subscription() {
         localStorage.setItem('school_unlocked', newStatus.school_unlocked ? 'true' : 'false');
         localStorage.setItem('subscription_status', JSON.stringify(newStatus));
         
-        // Update user data in localStorage
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        if (user) {
-          user.school = user.school || {};
-          user.school.is_unlocked = newStatus.school_unlocked;
-          user.has_active_subscription = newStatus.has_active_subscription;
-          localStorage.setItem('user', JSON.stringify(user));
-          setUser(user);
+        // Update user data in localStorage WITHOUT triggering re-render
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (currentUser) {
+          currentUser.school = currentUser.school || {};
+          currentUser.school.is_unlocked = newStatus.school_unlocked;
+          currentUser.has_active_subscription = newStatus.has_active_subscription;
+          localStorage.setItem('user', JSON.stringify(currentUser));
+          
+          // Only update user state if it's different
+          if (user && (user.school?.is_unlocked !== newStatus.school_unlocked || 
+              user.has_active_subscription !== newStatus.has_active_subscription)) {
+            setUser(currentUser);
+          }
         }
         
         return newStatus;
@@ -193,71 +199,76 @@ export default function Subscription() {
         active_subscription: null
       };
       
-      setSubscriptionStatus(defaultStatus);
-      localStorage.setItem('subscription_status', JSON.stringify(defaultStatus));
+      if (isMounted.current) {
+        setSubscriptionStatus(defaultStatus);
+        localStorage.setItem('subscription_status', JSON.stringify(defaultStatus));
+      }
     }
   };
 
-  // Update in Subscription.jsx
-const redirectToDashboard = (userData) => {
-  if (!userData) return;
-  
-  const userRole = userData.role?.toLowerCase();
-  let redirectPath = '';
-  
-  // Determine dashboard based on role
-  switch(userRole) {
-    case 'super_admin':
-      redirectPath = '/super-admin/dashboard';
-      break;
-    case 'admin':
-      redirectPath = '/school/dashboard';
-      break;
-    case 'employee':
-      const employeeType = userData.employee_type?.toLowerCase();
-      if (employeeType === 'non_teaching') {
-        redirectPath = '/account/dashboard';
-      } else {
-        redirectPath = '/employee/dashboard';
-      }
-      break;
-    case 'student':
-      redirectPath = '/student/dashboard';
-      break;
-    case 'parent':
-      redirectPath = '/parent/dashboard';
-      break;
-    default:
-      redirectPath = '/school/dashboard';
-  }
-  
-  console.log(`Redirecting ${userRole} to: ${redirectPath}`);
-  navigate(redirectPath, { replace: true });
-};
+  const redirectToDashboard = (userData) => {
+    if (!userData) return;
+    
+    const userRole = userData.role?.toLowerCase();
+    let redirectPath = '';
+    
+    // Determine dashboard based on role
+    switch(userRole) {
+      case 'super_admin':
+        redirectPath = '/super-admin/dashboard';
+        break;
+      case 'admin':
+        redirectPath = '/school/dashboard';
+        break;
+      case 'employee':
+        const employeeType = userData.employee_type?.toLowerCase();
+        if (employeeType === 'non_teaching') {
+          redirectPath = '/account/dashboard';
+        } else {
+          redirectPath = '/employee/dashboard';
+        }
+        break;
+      case 'student':
+        redirectPath = '/student/dashboard';
+        break;
+      case 'parent':
+        redirectPath = '/parent/dashboard';
+        break;
+      default:
+        redirectPath = '/school/dashboard';
+    }
+    
+    console.log(`Redirecting ${userRole} to: ${redirectPath}`);
+    navigate(redirectPath, { replace: true });
+  };
 
   const loadPricing = async () => {
     try {
       const res = await api.get('/subscriptions/pricing-options');
+      if (!isMounted.current) return;
+      
       if (res.data.status === 'success' && res.data.data) {
         setPricing(res.data.data);
       }
     } catch (err) {
       console.error('Failed to load pricing:', err);
       // Set default pricing
-      setPricing({
-        termly: {
-          base_price: 20000,
-          per_student: 2000,
-          duration: '4 months',
-          duration_days: 120
-        },
-        yearly: {
-          base_price: 50000,
-          per_student: 5000,
-          duration: '1 year',
-          duration_days: 365
-        }
-      });
+      if (isMounted.current) {
+        setPricing({
+          termly: {
+            base_price: 20000,
+            per_student: 2000,
+            duration: '4 months',
+            duration_days: 120
+          },
+          yearly: {
+            base_price: 50000,
+            per_student: 5000,
+            duration: '1 year',
+            duration_days: 365
+          }
+        });
+      }
     }
   };
 
@@ -298,7 +309,6 @@ const redirectToDashboard = (userData) => {
     setErrors({});
 
     try {
-      // Determine pricing ID based on plan type
       const pricingId = paymentForm.plan_type === 'termly' ? 1 : 2;
       
       const payload = {
@@ -321,23 +331,17 @@ const redirectToDashboard = (userData) => {
         
         const reference = paymentData.reference;
         
-        // Store reference for polling
         localStorage.setItem('pending_payment_reference', reference);
         
-        // Open payment page
         toast.success('Redirecting to payment gateway...');
         
-        // Try to open in new tab
         const paymentWindow = window.open(paymentUrl, '_blank', 'noopener,noreferrer');
         
         if (!paymentWindow || paymentWindow.closed) {
-          // Fallback: redirect in same tab
           window.location.href = paymentUrl;
         }
         
         setShowPaymentModal(false);
-        
-        // Start polling for payment verification
         startPaymentPolling(reference);
         
       } else {
@@ -361,64 +365,58 @@ const redirectToDashboard = (userData) => {
   };
 
   // Start payment polling
- // In Subscription.jsx - update the payment polling success handler
-
-const startPaymentPolling = (reference) => {
-  // Clear existing interval
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
-  }
-
-  let pollCount = 0;
-  const maxPolls = 60; // 5 minutes (5 seconds * 60)
-  
-  const interval = setInterval(async () => {
-    pollCount++;
-    
-    if (pollCount > maxPolls) {
-      clearInterval(interval);
-      localStorage.removeItem('pending_payment_reference');
-      toast.error('Payment verification timeout');
-      return;
+  const startPaymentPolling = (reference) => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
     }
+
+    let pollCount = 0;
+    const maxPolls = 60;
     
-    try {
-      // Verify payment - FIXED ENDPOINT
-      const verifyResponse = await api.post('/subscriptions/verify', { reference });
+    const interval = setInterval(async () => {
+      pollCount++;
       
-      if (verifyResponse.data.status === 'success') {
+      if (pollCount > maxPolls) {
         clearInterval(interval);
         localStorage.removeItem('pending_payment_reference');
-        
-        toast.success('Payment completed successfully!');
-        
-        // Update subscription status
-        await checkSubscriptionStatus();
-        
-        // Get updated user data
-        const updatedUser = JSON.parse(localStorage.getItem('user') || '{}');
-        
-        // Redirect to dashboard after short delay
-        setTimeout(() => {
-          redirectToDashboard(updatedUser);
-        }, 2000);
-        
-        // Refresh all data
-        loadAllData();
-        
-      } else if (verifyResponse.data.status === 'failed') {
-        clearInterval(interval);
-        localStorage.removeItem('pending_payment_reference');
-        toast.error('Payment failed. Please try again.');
+        toast.error('Payment verification timeout');
+        return;
       }
-    } catch (err) {
-      console.error('Polling error:', err);
-      // Continue polling on errors
-    }
-  }, 5000); // Poll every 5 seconds
+      
+      try {
+        const verifyResponse = await api.post('/subscriptions/verify', { reference });
+        
+        if (verifyResponse.data.status === 'success') {
+          clearInterval(interval);
+          localStorage.removeItem('pending_payment_reference');
+          
+          toast.success('Payment completed successfully!');
+          
+          // Update subscription status without causing infinite loop
+          const status = await checkSubscriptionStatus();
+          
+          if (status?.school_unlocked) {
+            const updatedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            setTimeout(() => {
+              redirectToDashboard(updatedUser);
+            }, 2000);
+          }
+          
+          // Refresh subscriptions only
+          await loadSubscriptions();
+          
+        } else if (verifyResponse.data.status === 'failed') {
+          clearInterval(interval);
+          localStorage.removeItem('pending_payment_reference');
+          toast.error('Payment failed. Please try again.');
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    }, 5000);
 
-  setPollingInterval(interval);
-};
+    setPollingInterval(interval);
+  };
 
   const handleCompletePayment = async (subscription) => {
     if (!subscription.payment_reference) {
@@ -426,7 +424,6 @@ const startPaymentPolling = (reference) => {
       return;
     }
 
-    // Check if payment is expired
     const now = new Date();
     const createdAt = new Date(subscription.created_at);
     const hoursDiff = (now - createdAt) / (1000 * 60 * 60);
@@ -437,7 +434,6 @@ const startPaymentPolling = (reference) => {
       return;
     }
 
-    // Continue with existing payment
     const paymentUrl = subscription.authorization_url || 
                       `https://checkout.paystack.com/${subscription.payment_reference}`;
     
@@ -480,7 +476,6 @@ const startPaymentPolling = (reference) => {
         
         window.open(paymentUrl, '_blank', 'noopener,noreferrer');
         setShowExpiredModal(false);
-        
         startPaymentPolling(paymentData.reference);
       }
     } catch (err) {
@@ -497,7 +492,7 @@ const startPaymentPolling = (reference) => {
       await api.delete(`/subscriptions/${expiredSubscription.id}`);
       toast.success('Payment cancelled');
       setShowExpiredModal(false);
-      loadAllData();
+      await loadSubscriptions();
     } catch (err) {
       toast.error('Failed to cancel payment');
     }
@@ -543,6 +538,8 @@ const startPaymentPolling = (reference) => {
   };
 
   const handleRefresh = () => {
+    // Reset initialization flag to allow refresh
+    hasInitialized.current = false;
     loadAllData();
     toast.success('Refreshing data...');
   };

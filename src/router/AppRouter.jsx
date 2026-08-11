@@ -4,7 +4,7 @@ import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom"
    LAYOUTS
 ======================= */
 import MainLayout from "../layouts/MainLayout";
-import SchoolLayout from "../layouts/AdminLayout"; // school users
+import SchoolLayout from "../layouts/AdminLayout";
 import SuperAdminLayout from "../layouts/SuperAdminLayout";
 
 /* =======================
@@ -14,10 +14,9 @@ import ProtectedRoute from "../components/ProtectedRoute";
 
 /* =======================
   FORGOT PASSWORD & RESET
-  =======================*/
+======================= */
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
-
 
 /* =======================
    PUBLIC PAGES
@@ -55,6 +54,19 @@ import ResultLocker from "../pages/ResultLocker";
 import EmployeeGrade from "../pages/EmployeeGrade";
 import EmployeeSubject from "../pages/EmployeeSubject";
 import Attendance from "../pages/Attendance";
+import Admission from "../pages/Admission";
+import Timetable from "../pages/Timetable";
+import Assignment from "../pages/Assignment";
+import AssignmentSubmission from "../pages/AssignmentSubmission";
+import LiveClass from "../pages/LiveClass";
+import LiveChat from "../pages/LiveChat";
+import Recording from "../pages/Recording";
+import Poll from "../pages/Poll";
+import PollResponse from "../pages/PollResponse";
+import Whiteboard from "../pages/Whiteboard";
+import ClassAttendance from "../pages/ClassAttendance"; // Fixed typo: ClassAttendannce -> ClassAttendance
+import Meeting from "../pages/Meeting";
+import MeetingParticipant from "../pages/MeetingParticipant";
 
 /* =======================
    EMPLOYEE PAGES
@@ -83,9 +95,10 @@ import SuperAdminUserRegister from "../pages/SuperAdminUserRegister";
    404
 ======================= */
 import NotFound from "../pages/NotFound";
+
 /* ======================
-  REPORTS
-  =======================*/
+   REPORTS
+======================= */
 import StudentReport from "../pages/reports/StudentReport";
 import FeeReceipts from "../pages/reports/FeeReceipts";
 import IncomeExpenditure from "../pages/reports/IncomeExpenditure";
@@ -113,6 +126,19 @@ const schoolPages = [
   ["employee-grades", EmployeeGrade],
   ["employee-subjects", EmployeeSubject],
   ["attendances", Attendance],
+  ["admissions", Admission],
+  ["timetables", Timetable],
+  ["assignments", Assignment],
+  ["assignment-submissions", AssignmentSubmission],
+  ["live-classes", LiveClass],
+  ["live-chats", LiveChat],
+  ["recordings", Recording],
+  ["polls", Poll],
+  ["poll-responses", PollResponse],
+  ["whiteboards", Whiteboard],
+  ["class-attendances", ClassAttendance],
+  ["meetings", Meeting],
+  ["meeting-participants", MeetingParticipant],
 ];
 
 /* =======================
@@ -129,10 +155,8 @@ const router = createBrowserRouter(
         { path: "/forgot-password", element: <ForgotPassword /> },
         { path: "/reset-password", element: <ResetPassword /> },
         { path: "/register/super-admin", element: <SuperAdminRegister /> },
+        { path: "/change-password", element: <ChangePassword /> },
         
-        
-      
-
         // Paystack callbacks
         { path: "/payment/callback", element: <PaymentCallback /> },
         { path: "/payment/success", element: <PaymentSuccess /> },
@@ -141,22 +165,14 @@ const router = createBrowserRouter(
       ],
     },
 
-    // In AppRouter.jsx - add this after the public routes and before force password change
-
-      /* ---------- REDIRECTS (Catch old admin paths) ---------- */
-      {
-        path: "/admin",
-        element: <Navigate to="/school/dashboard" replace />,
-      },
-      {
-        path: "/admin/*",
-        element: <Navigate to="/school/dashboard" replace />,
-      },
-
-    /* ---------- FORCE PASSWORD CHANGE ---------- */
+    /* ---------- REDIRECTS (Catch old admin paths) ---------- */
     {
-      path: "/change-password",
-      element: <ChangePassword />,
+      path: "/admin",
+      element: <Navigate to="/school/dashboard" replace />,
+    },
+    {
+      path: "/admin/*",
+      element: <Navigate to="/school/dashboard" replace />,
     },
 
     /* ---------- SCHOOL ADMIN ---------- */
@@ -175,7 +191,16 @@ const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
-         {
+        {
+          path: "/school/subscriptions",
+          element: (
+            <ProtectedRoute requiredRole="admin">
+              <Subscription />
+            </ProtectedRoute>
+          ),
+        },
+        // Reports
+        {
           path: "/school/reports/student-results",
           element: (
             <ProtectedRoute requiredRole="admin" requireSubscription>
@@ -214,15 +239,8 @@ const router = createBrowserRouter(
               <EmployeesReport />
             </ProtectedRoute>
           ),
-    },
-        {
-          path: "/school/subscriptions",
-          element: (
-            <ProtectedRoute requiredRole="admin">
-              <Subscription />
-            </ProtectedRoute>
-          ),
         },
+        // Dynamic school pages
         ...schoolPages.map(([path, Component]) => ({
           path: `/school/${path}`,
           element: (
@@ -237,7 +255,7 @@ const router = createBrowserRouter(
     /* ---------- TEACHING STAFF ---------- */
     {
       element: (
-        <ProtectedRoute requiredRole="employee">
+        <ProtectedRoute requiredRole="employee" employeeType="teaching">
           <SchoolLayout />
         </ProtectedRoute>
       ),
@@ -250,7 +268,6 @@ const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
-        // Teaching staff can view/create/edit students
         {
           path: "/employee/students",
           element: (
@@ -275,13 +292,21 @@ const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
+        {
+          path: "/employee/timetables",
+          element: (
+            <ProtectedRoute requiredRole="employee" requireSubscription>
+              <Timetable />
+            </ProtectedRoute>
+          ),
+        },
       ],
     },
 
     /* ---------- ACCOUNT STAFF ---------- */
     {
       element: (
-        <ProtectedRoute requiredRole="employee">
+        <ProtectedRoute requiredRole="employee" employeeType="non_teaching">
           <SchoolLayout />
         </ProtectedRoute>
       ),
@@ -342,12 +367,11 @@ const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
-        // Account staff can view fee reports
         {
           path: "/account/reports/fee-receipts",
           element: (
             <ProtectedRoute requiredRole="employee" requireSubscription>
-              <div>Fee Receipts Reports</div>
+              <FeeReceipts />
             </ProtectedRoute>
           ),
         },
@@ -374,7 +398,7 @@ const router = createBrowserRouter(
           path: "/student/report-card",
           element: (
             <ProtectedRoute requiredRole="student" requireSubscription>
-              <div>Report Card Page</div>
+              <StudentReport />
             </ProtectedRoute>
           ),
         },
@@ -382,7 +406,23 @@ const router = createBrowserRouter(
           path: "/student/fees",
           element: (
             <ProtectedRoute requiredRole="student" requireSubscription>
-              <div>Fee Statement Page</div>
+              <FeePayment />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/student/timetables",
+          element: (
+            <ProtectedRoute requiredRole="student" requireSubscription>
+              <Timetable />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/student/attendances",
+          element: (
+            <ProtectedRoute requiredRole="student" requireSubscription>
+              <Attendance />
             </ProtectedRoute>
           ),
         },
@@ -406,10 +446,18 @@ const router = createBrowserRouter(
           ),
         },
         {
-          path: "/parent/reports",
+          path: "/parent/children",
           element: (
             <ProtectedRoute requiredRole="parent" requireSubscription>
-              <div>Children's Reports Page</div>
+              <Student />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/parent/report-card",
+          element: (
+            <ProtectedRoute requiredRole="parent" requireSubscription>
+              <StudentReport />
             </ProtectedRoute>
           ),
         },
@@ -417,7 +465,7 @@ const router = createBrowserRouter(
           path: "/parent/fees",
           element: (
             <ProtectedRoute requiredRole="parent" requireSubscription>
-              <div>Fee Statements Page</div>
+              <FeePayment />
             </ProtectedRoute>
           ),
         },
@@ -434,8 +482,10 @@ const router = createBrowserRouter(
       children: [
         { path: "/super-admin/dashboard", element: <SuperAdminDashboard /> },
         { path: "/super-admin/schools", element: <SuperAdminSchools /> },
+        { path: "/super-admin/subscriptions", element: <Subscription /> },
         { path: "/super-admin/settings", element: <SuperAdminSettings /> },
         { path: "/super-admin/register", element: <SuperAdminUserRegister /> },
+        { path: "/super-admin/pricing", element: <div>Pricing Management</div> },
       ],
     },
 

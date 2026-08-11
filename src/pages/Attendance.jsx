@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "../api/axios";
 import toast from "react-hot-toast";
 import DataTable from "../components/DataTable";
@@ -23,8 +23,8 @@ export default function Attendance() {
     try {
       const userData = localStorage.getItem('user');
       if (userData) {
-        const user = JSON.parse(userData);
-        return user?.school?.id || user?.school_id;
+        const parsedUser = JSON.parse(userData);
+        return parsedUser?.school?.id || parsedUser?.school_id;
       }
     } catch (error) { 
       console.error("Error getting school ID:", error);
@@ -45,7 +45,11 @@ export default function Attendance() {
     return [];
   };
 
-  // Load available grades for this user (filtered by employee_grade assignments)
+  // Helper for grade and session names
+  const getGradeName = (grade) => grade?.name || grade?.grade_name || grade?.title || 'N/A';
+  const getSessionName = (session) => session?.name || session?.session_name || 'N/A';
+
+  // Load available grades for this user
   const loadAvailableGrades = async () => {
     const schoolId = getSchoolId();
     if (!schoolId) return;
@@ -57,7 +61,6 @@ export default function Attendance() {
       const gradesData = res.data?.data || [];
       setGrades(gradesData);
       
-      // Auto-select first grade if available and none selected
       if (gradesData.length > 0 && !selectedGrade) {
         setSelectedGrade(gradesData[0].id?.toString() || "");
       }
@@ -67,7 +70,7 @@ export default function Attendance() {
     }
   };
 
-  // Load students for selected grade (with access control)
+  // Load students for selected grade
   const loadStudentsByGrade = async (gradeId) => {
     const schoolId = getSchoolId();
     if (!schoolId || !gradeId) return [];
@@ -91,7 +94,7 @@ export default function Attendance() {
     }
   };
 
-  // Load all data
+  // Load all attendance and session data
   const loadAllData = async () => {
     setLoading(true);
     const schoolId = getSchoolId();
@@ -126,41 +129,49 @@ export default function Attendance() {
   };
 
   useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-    setUser(storedUser);
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      setUser(storedUser);
+    } catch (e) {
+      console.error("Failed to parse stored user", e);
+    }
     loadAvailableGrades();
     loadAllData();
   }, []);
 
-  // When grade is selected, load students
-  useEffect(() => {
-    if (selectedGrade) {
-      loadStudentsByGrade(selectedGrade).then(studentsData => {
-        initializeAttendanceRecords(studentsData);
-      });
-    } else {
-      setAttendanceRecords([]);
-    }
-  }, [selectedGrade, attendanceDate, selectedSession]);
+  // Map student array into local editable attendance records
+  const initializeAttendanceRecords = useCallback((studentsList, currentAttendances) => {
+    if (!Array.isArray(studentsList)) return;
 
-  const initializeAttendanceRecords = (studentsList) => {
     const records = studentsList.map(student => {
-      const existingAttendance = attendances.find(att => 
+      const existingAttendance = currentAttendances.find(att => 
         att.student_id === student.id && 
         att.attendance_date?.split('T')[0] === attendanceDate
       );
+      
       return {
         student_id: student.id,
-        student_name: student.name || 'N/A',
+        student_name: student.name || `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'N/A',
         grade_id: parseInt(selectedGrade),
         school_session_id: selectedSession ? parseInt(selectedSession) : null,
         attendance_date: attendanceDate,
-        is_present: existingAttendance ? existingAttendance.is_present : true,
+        is_present: existingAttendance ? Boolean(Number(existingAttendance.is_present)) : true,
         existing_id: existingAttendance?.id
       };
     });
     setAttendanceRecords(records);
-  };
+  }, [attendanceDate, selectedGrade, selectedSession]);
+
+  // Sync attendance state when grade, date, or sessions change
+  useEffect(() => {
+    if (selectedGrade) {
+      loadStudentsByGrade(selectedGrade).then(studentsData => {
+        initializeAttendanceRecords(studentsData, attendances);
+      });
+    } else {
+      setAttendanceRecords([]);
+    }
+  }, [selectedGrade, attendanceDate, selectedSession, attendances, initializeAttendanceRecords]);
 
   const toggleAttendance = (studentId) => {
     setAttendanceRecords(prev => prev.map(record => 
@@ -244,16 +255,12 @@ export default function Attendance() {
     }
   };
 
-  const getGradeName = (grade) => grade?.name || grade?.grade_name || 'N/A';
-  const getSessionName = (session) => session?.name || session?.session_name || 'N/A';
-
-  // Check if user is admin (can see all grades)
   const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
   const safeGrades = Array.isArray(grades) ? grades : [];
   const safeSessions = Array.isArray(sessions) ? sessions : [];
   const attendancesArray = Array.isArray(attendances) ? attendances : [];
 
-  // ========== DATATABLE FOR RECENT ATTENDANCE RECORDS ==========
+  // Table Columns Definition
   const tableColumns = [
     { header: "Student", accessor: "student_name", width: "200px" },
     { header: "Grade", accessor: "grade_name", width: "150px" },
@@ -262,24 +269,26 @@ export default function Attendance() {
   ];
 
   const getTableData = () => {
-    // Filter recent attendance by selected grade if employee
     let filtered = attendancesArray;
     if (!isAdmin && selectedGrade) {
       filtered = attendancesArray.filter(a => a.grade_id?.toString() === selectedGrade);
     }
     
-    return filtered.slice(0, 10).map((attendance, index) => ({
-      id: attendance.id,
-      student_name: attendance.student?.name || 'N/A',
-      grade_name: getGradeName(attendance.grade),
-      date_formatted: attendance.attendance_date ? new Date(attendance.attendance_date).toLocaleDateString() : 'N/A',
-      status_badge: (
-        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${attendance.is_present ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
-          {attendance.is_present ? 'Present' : 'Absent'}
-        </span>
-      ),
-      original: attendance
-    }));
+    return filtered.slice(0, 10).map((attendance) => {
+      const isPresent = Boolean(Number(attendance.is_present));
+      return {
+        id: attendance.id,
+        student_name: attendance.student?.name || `${attendance.student?.first_name || ''} ${attendance.student?.last_name || ''}`.trim() || 'N/A',
+        grade_name: getGradeName(attendance.grade),
+        date_formatted: attendance.attendance_date ? new Date(attendance.attendance_date).toLocaleDateString() : 'N/A',
+        status_badge: (
+          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${isPresent ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+            {isPresent ? 'Present' : 'Absent'}
+          </span>
+        ),
+        original: attendance
+      };
+    });
   };
 
   const renderActions = (row) => (
@@ -314,7 +323,6 @@ export default function Attendance() {
         <h3 className="text-lg font-semibold mb-4">Take Attendance</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Grade Selection - Only shows assigned grades for teachers */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
               Select Grade <span className="text-red-400">*</span>
@@ -322,7 +330,7 @@ export default function Attendance() {
             <select 
               value={selectedGrade} 
               onChange={(e) => setSelectedGrade(e.target.value)} 
-              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white"
+              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
             >
               <option value="">Select Grade</option>
               {safeGrades.map(grade => (
@@ -336,7 +344,6 @@ export default function Attendance() {
             )}
           </div>
 
-          {/* Session Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
               Select Session
@@ -344,7 +351,7 @@ export default function Attendance() {
             <select 
               value={selectedSession} 
               onChange={(e) => setSelectedSession(e.target.value)} 
-              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white"
+              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
             >
               <option value="">Select Session</option>
               {safeSessions.map(session => (
@@ -353,7 +360,6 @@ export default function Attendance() {
             </select>
           </div>
 
-          {/* Date Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
               Attendance Date <span className="text-red-400">*</span>
@@ -362,23 +368,22 @@ export default function Attendance() {
               type="date" 
               value={attendanceDate} 
               onChange={(e) => setAttendanceDate(e.target.value)} 
-              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white" 
+              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500" 
             />
           </div>
 
-          {/* Bulk Actions */}
           <div className="flex items-end">
             {selectedGrade && attendanceRecords.length > 0 && (
               <div className="flex space-x-2 w-full">
                 <button 
                   onClick={markAllPresent} 
-                  className="flex-1 bg-green-600 hover:bg-green-700 px-3 py-2 rounded font-medium text-sm"
+                  className="flex-1 bg-green-600 hover:bg-green-700 px-3 py-2 rounded font-medium text-sm transition-colors"
                 >
                   All Present
                 </button>
                 <button 
                   onClick={markAllAbsent} 
-                  className="flex-1 bg-red-600 hover:bg-red-700 px-3 py-2 rounded font-medium text-sm"
+                  className="flex-1 bg-red-600 hover:bg-red-700 px-3 py-2 rounded font-medium text-sm transition-colors"
                 >
                   All Absent
                 </button>
@@ -388,7 +393,7 @@ export default function Attendance() {
         </div>
       </div>
 
-      {/* Attendance Table */}
+      {/* Main Attendance Sheet */}
       <div className="bg-slate-800 rounded-lg p-4 overflow-x-auto">
         {loading ? (
           <div className="text-center py-8">
@@ -410,7 +415,7 @@ export default function Attendance() {
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h3 className="text-lg font-semibold">
-                  {safeGrades.find(g => g.id?.toString() === selectedGrade)?.name || 'Selected Grade'}
+                  {getGradeName(safeGrades.find(g => g.id?.toString() === selectedGrade)) || 'Selected Grade'}
                 </h3>
                 <p className="text-sm text-gray-400">
                   {attendanceRecords.length} students • Date: {new Date(attendanceDate).toLocaleDateString()}
@@ -419,7 +424,7 @@ export default function Attendance() {
               <button 
                 onClick={saveAllAttendance} 
                 disabled={bulkSaving} 
-                className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium disabled:opacity-50 flex items-center gap-2"
+                className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium disabled:opacity-50 flex items-center gap-2 transition-colors"
               >
                 {bulkSaving && <RefreshCw className="h-4 w-4 animate-spin" />}
                 {bulkSaving ? "Saving..." : `Save All (${attendanceRecords.length})`}
@@ -463,7 +468,7 @@ export default function Attendance() {
                       <button 
                         onClick={() => saveSingleAttendance(record)} 
                         disabled={saving} 
-                        className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm font-medium disabled:opacity-50"
+                        className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm font-medium disabled:opacity-50 transition-colors"
                       >
                         {saving ? "Saving..." : "Save"}
                       </button>
@@ -476,7 +481,7 @@ export default function Attendance() {
         )}
       </div>
 
-      {/* Recent Attendance Records Table - Only shows relevant records */}
+      {/* Recent Records DataTable */}
       {attendancesArray.length > 0 && (
         <div className="mt-8">
           <div className="flex justify-between items-center mb-4">

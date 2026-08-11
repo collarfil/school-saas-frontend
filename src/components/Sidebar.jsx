@@ -9,6 +9,7 @@ import {
   Book,
   Users,
   User,
+  Video,
   Briefcase,
   Wallet,
   CreditCard,
@@ -25,7 +26,12 @@ import {
   AlertTriangle,
   CalendarDays,
   GraduationCap,
-  DollarSign
+  DollarSign,
+  // ADD MISSING IMPORTS
+  MessageCircle,  // For Live Chat
+  Edit,           // For Whiteboard
+  UserPlus,       // For Admissions
+  Settings        // For Settings (if needed)
 } from "lucide-react";
 import api from '../api/axios';
 
@@ -94,6 +100,7 @@ export default function Sidebar() {
             { name: "Section", path: "/school/sections", icon: <Grid className="w-4 h-4" /> },
             { name: "Grade", path: "/school/grades", icon: <ClipboardList className="w-4 h-4" /> },
             { name: "Subject", path: "/school/subjects", icon: <Book className="w-4 h-4" /> },
+            { name: "Admission", path: "/school/admissions", icon: <UserPlus className="w-4 h-4" /> },
           ]
         },
         {
@@ -133,6 +140,27 @@ export default function Sidebar() {
             { name: "Employee-Grade", path: "/school/employee-grades", icon: <ClipboardList className="w-4 h-4" /> },
             { name: "Employee-Subject", path: "/school/employee-subjects", icon: <Book className="w-4 h-4" /> },
             { name: "Attendance", path: "/school/attendances", icon: <CalendarDays className="w-4 h-4" /> },
+            { name: "Timetable", path: "/school/timetables", icon: <Calendar className="w-4 h-4" /> },
+          ]
+        },
+        {
+          id: 'onlinelearning',
+          title: 'Online Learning',
+          icon: <Book className="w-4 h-4" />,
+          type: 'dropdown',
+          requiresSubscription: true,
+          submenus: [
+            { name: "Live Classes", path: "/school/live-classes", icon: <Book className="w-4 h-4" /> },
+            { name: "Assignments", path: "/school/assignments", icon: <Grid className="w-4 h-4" /> },
+            { name: "Assignment Submissions", path: "/school/assignment-submissions", icon: <Users className="w-4 h-4" /> },
+            { name: "Class Attendance", path: "/school/class-attendances", icon: <CalendarDays className="w-4 h-4" /> },
+            { name: "Recordings", path: "/school/recordings", icon: <Video className="w-4 h-4" /> },
+            { name: "Meetings", path: "/school/meetings", icon: <CalendarDays className="w-4 h-4" /> },
+            { name: "Meeting Participants", path: "/school/meeting-participants", icon: <Users className="w-4 h-4" /> },
+            { name: "Polls", path: "/school/polls", icon: <ClipboardList className="w-4 h-4" /> },
+            { name: "Poll Responses", path: "/school/poll-responses", icon: <Users className="w-4 h-4" /> },
+            { name: "Live Chat", path: "/school/live-chats", icon: <MessageCircle className="w-4 h-4" /> },
+            { name: "Whiteboard", path: "/school/whiteboards", icon: <Edit className="w-4 h-4" /> },
           ]
         },
         {

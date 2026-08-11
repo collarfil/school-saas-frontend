@@ -64,10 +64,10 @@ export default function Session() {
       
       setSessions(sessionsData);
       
-      if (sessionsData.length === 0) {
-        console.log("ℹ️ No sessions found.");
-        toast.info("No sessions found. Create your first session.");
-      }
+     if (sessionsData.length === 0) {
+  console.log("ℹ️ No sessions found.");
+  toast("No sessions found. Create your first session.", { icon: "ℹ️" });
+}
       
     } catch (error) {
       console.error("❌ Fetch error details:", {

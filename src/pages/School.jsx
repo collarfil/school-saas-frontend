@@ -107,6 +107,16 @@ export default function School() {
     }
   };
 
+  // Form field configuration
+  const formFields = [
+    { key: "owner", placeholder: "Owner", required: true },
+    { key: "name", placeholder: "School Name", required: true },
+    { key: "email", placeholder: "Email", type: "email" },
+    { key: "phone", placeholder: "Phone" },
+    { key: "address", placeholder: "Address" },
+    { key: "logo", placeholder: "Logo URL" },
+  ];
+
   return (
     <div className="text-white">
       {/* Header */}
@@ -198,42 +208,49 @@ export default function School() {
         </table>
       </div>
 
-      {/* Modal */}
+      {/* Modal with Double Column Layout */}
       {show && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="bg-slate-800 p-6 rounded-lg w-full max-w-md shadow-lg">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
+          <div className="bg-slate-800 p-6 rounded-lg w-full max-w-3xl shadow-lg">
             <h3 className="text-xl font-semibold mb-4">
               {editId ? "Edit School" : "Add School"}
             </h3>
-            <form onSubmit={handleSubmit} className="space-y-3">
-              {["owner", "name", "email", "phone", "address", "logo"].map(
-                (key) => (
-                  <input
-                    key={key}
-                    value={form[key]}
-                    onChange={(e) =>
-                      setForm({ ...form, [key]: e.target.value })
-                    }
-                    placeholder={
-                      key.charAt(0).toUpperCase() + key.slice(1)
-                    }
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white placeholder-gray-400"
-                  />
-                )
-              )}
+            <form onSubmit={handleSubmit}>
+              {/* Double Column Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {formFields.map((field) => (
+                  <div key={field.key} className="col-span-1">
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      {field.placeholder}
+                      {field.required && <span className="text-red-400 ml-1">*</span>}
+                    </label>
+                    <input
+                      type={field.type || "text"}
+                      value={form[field.key]}
+                      onChange={(e) =>
+                        setForm({ ...form, [field.key]: e.target.value })
+                      }
+                      placeholder={`Enter ${field.placeholder.toLowerCase()}`}
+                      className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required={field.required || false}
+                    />
+                  </div>
+                ))}
+              </div>
 
-              <div className="flex justify-end gap-2 mt-4">
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-slate-700">
                 <button
                   type="button"
                   onClick={() => setShow(false)}
-                  className="bg-gray-600 px-3 py-1 rounded hover:bg-gray-500"
+                  className="bg-gray-600 px-4 py-2 rounded hover:bg-gray-500 transition font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-blue-600 px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+                  className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? "Saving..." : "Save"}
                 </button>
