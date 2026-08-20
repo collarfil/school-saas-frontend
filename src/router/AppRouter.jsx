@@ -139,6 +139,17 @@ const schoolPages = [
   ["class-attendances", ClassAttendance],
   ["meetings", Meeting],
   ["meeting-participants", MeetingParticipant],
+  ["exam-sessions", () => import("../pages/ExamSession").then(module => module.default)],
+  ["exam-grades", () => import("../pages/ExamGrade").then(module => module.default)],
+  ["exam-results", () => import("../pages/ExamResult").then(module => module.default)],
+  ["student-responses", () => import("../pages/StudentResponse").then(module => module.default)],
+  ["exam-types", () => import("../pages/ExamType").then(module => module.default)],
+  ["options", () => import("../pages/Option").then(module => module.default)],
+  ["exam", () => import("../pages/Exam").then(module => module.default)],
+  ["questions", () => import("../pages/Question").then(module => module.default)],
+  
+  
+
 ];
 
 /* =======================
