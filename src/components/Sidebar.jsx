@@ -171,10 +171,10 @@ export default function Sidebar() {
           requiresSubscription: true,
           submenus: [
             { name: "Exams", path: "/school/exams", icon: <Book className="w-4 h-4" /> },
+            { name: 'Exam Types', path: "/school/exam-types", icon: <Book className="w-4 h-4" /> },
             { name: "Questions", path: "/school/questions", icon: <Grid className="w-4 h-4" /> },
             { name: 'Exam Sessions', path: "/school/exam-sessions", icon: <Calendar className="w-4 h-4" /> },
             { name: 'Exam Grades', path: "/school/exam-grades", icon: <ClipboardList className="w-4 h-4" /> },
-            { name: 'Exam Types', path: "/school/exam-types", icon: <Book className="w-4 h-4" /> },
             {name: 'Student Responses', path: "/school/student-responses", icon: <Users className="w-4 h-4" /> },
             { name: 'Exam Results', path: "/school/exam-results", icon: <FileText className="w-4 h-4" /> },
             {name: 'Options', path: "/school/exam-options", icon: <Settings className="w-4 h-4" /> }, 

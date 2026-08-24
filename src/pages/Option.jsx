@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../api/axios";
@@ -11,7 +11,7 @@ export default function Option() {
   const [showModal, setShowModal] = useState(false);
 
   const [form, setForm] = useState({
-    question_id: "",
+    question_id: question_id || "",
     option_text: "",
     option_image: "",
     is_correct: false
@@ -21,8 +21,11 @@ export default function Option() {
   const [loading, setLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
 
-  const fetchOptions = async () => {
-    if (!question_id) return;
+  const fetchOptions = useCallback(async () => {
+    if (!question_id) {
+      console.warn("⚠️ Missing question_id route parameter.");
+      return;
+    }
     setLoading(true);
     try {
       const response = await api.get(`/CBT/questions/${question_id}/options`);
@@ -33,14 +36,20 @@ export default function Option() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [question_id]);
 
   useEffect(() => {
     fetchOptions();
-  }, [question_id]);
+  }, [fetchOptions]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!question_id) {
+      toast.error("Missing question parameter binding.");
+      return;
+    }
+
     setSaveLoading(true);
 
     const payload = {
@@ -109,7 +118,7 @@ export default function Option() {
 
   const resetForm = () => {
     setForm({
-      question_id: question_id,
+      question_id: question_id || "",
       option_text: "",
       option_image: "",
       is_correct: false
@@ -195,7 +204,7 @@ export default function Option() {
 
               <div className="flex justify-end space-x-3 pt-4 border-t border-slate-700">
                 <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="px-4 py-2 bg-gray-600 rounded font-medium">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 rounded font-medium text-white disabled:bg-blue-400">{saveLoading ? "Writing Option Configuration..." : "Commit Matrix Choice"}</button>
+                <button type="submit" disabled={saveLoading} className="px-4 py-2 bg-blue-600 rounded font-medium text-white disabled:bg-blue-400">{saveLoading ? "Writing Option Configuration..." : "Commit Matrix Choice"}</button>
               </div>
             </form>
           </div>

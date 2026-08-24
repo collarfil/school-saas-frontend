@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api/axios";
 import DataTable from "../components/DataTable";
-import { Edit, Trash2, Plus, Eye, Calendar, Clock, Video, Users, Play, CheckCircle, XCircle, Link } from "lucide-react";
+import { Edit, Trash2, Plus, Eye, Video, CheckCircle, XCircle, Link, Search } from "lucide-react";
+import { Play } from 'lucide-react';
 
 export default function LiveClass() {
   const [liveClasses, setLiveClasses] = useState([]);
@@ -15,6 +16,10 @@ export default function LiveClass() {
   const [selectedLiveClass, setSelectedLiveClass] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+
+  // Search state for Subject searchable dropdown
+  const [subjectSearch, setSubjectSearch] = useState("");
+  const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
 
   const [form, setForm] = useState({
     grade_id: "",
@@ -41,6 +46,16 @@ export default function LiveClass() {
     return user?.school?.id || user?.school_id;
   };
 
+  // Helper to safely extract array data from diverse Laravel API wrappers
+  const extractArrayData = (res) => {
+    if (!res) return [];
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res.data)) return res.data;
+    if (Array.isArray(res.data?.data)) return res.data.data;
+    if (Array.isArray(res.data?.data?.data)) return res.data.data.data;
+    return [];
+  };
+
   const fetchAll = async () => {
     setLoading(true);
     const schoolId = getSchoolId();
@@ -52,20 +67,20 @@ export default function LiveClass() {
     }
 
     try {
-      const [liveClassesRes, gradesRes, employeesRes, subjectsRes, sessionsRes] = await Promise.all([
+      const results = await Promise.allSettled([
         api.get("/live-classes", { params: { school_id: schoolId } }),
         api.get("/grades", { params: { school_id: schoolId } }),
         api.get("/employees", { params: { school_id: schoolId } }),
         api.get("/subjects", { params: { school_id: schoolId } }),
         api.get("/school-sessions", { params: { school_id: schoolId } })
       ]);
-      
-      setLiveClasses(liveClassesRes.data?.data?.data || liveClassesRes.data?.data || []);
-      setGrades(gradesRes.data?.data || gradesRes.data || []);
-      setEmployees(employeesRes.data?.data || employeesRes.data || []);
-      setSubjects(subjectsRes.data?.data || subjectsRes.data || []);
-      setSessions(sessionsRes.data?.data || sessionsRes.data || []);
-      
+
+      if (results[0].status === "fulfilled") setLiveClasses(extractArrayData(results[0].value.data));
+      if (results[1].status === "fulfilled") setGrades(extractArrayData(results[1].value.data));
+      if (results[2].status === "fulfilled") setEmployees(extractArrayData(results[2].value.data));
+      if (results[3].status === "fulfilled") setSubjects(extractArrayData(results[3].value.data));
+      if (results[4].status === "fulfilled") setSessions(extractArrayData(results[4].value.data));
+
     } catch (err) {
       console.error("❌ Fetch error:", err);
       toast.error("Failed to fetch data");
@@ -110,7 +125,6 @@ export default function LiveClass() {
       
     } catch (error) {
       console.error("❌ Save error:", error);
-      
       if (error.response?.data?.errors) {
         Object.values(error.response.data.errors).forEach(messages => {
           messages.forEach(message => toast.error(message));
@@ -195,6 +209,8 @@ export default function LiveClass() {
       recurrence_pattern: "",
       max_participants: 0
     });
+    setSubjectSearch("");
+    setIsSubjectDropdownOpen(false);
     setEditId(null);
   };
 
@@ -235,7 +251,7 @@ export default function LiveClass() {
       id: liveClass.id,
       title: liveClass.title,
       subject_name: liveClass.subject?.name || "N/A",
-      teacher_name: liveClass.employee?.name || "N/A",
+      teacher_name: liveClass.employee ? `${liveClass.employee.first_name || ''} ${liveClass.employee.last_name || ''}`.trim() || liveClass.employee.name : "N/A",
       grade_name: liveClass.grade?.name || "N/A",
       start_time: formatDate(liveClass.start_time),
       status_badge: getStatusBadge(liveClass.status),
@@ -298,6 +314,9 @@ export default function LiveClass() {
     </div>
   );
 
+  const selectedSubjectName = subjects.find(s => s.id == form.subject_id)?.name || "Select Subject";
+  const filteredSubjects = subjects.filter(s => s.name?.toLowerCase().includes(subjectSearch.toLowerCase()));
+
   return (
     <div className="text-white p-6">
       <div className="flex justify-between items-center mb-6">
@@ -315,7 +334,6 @@ export default function LiveClass() {
         </button>
       </div>
 
-      {/* Data Table */}
       <DataTable
         columns={tableColumns}
         data={getTableData()}
@@ -390,22 +408,52 @@ export default function LiveClass() {
                   </select>
                 </div>
 
-                <div>
+                {/* SEARCHABLE SUBJECT DROPDOWN */}
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-300 mb-1">
                     Subject <span className="text-red-400">*</span>
                   </label>
-                  <select
-                    value={form.subject_id}
-                    onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                    required
-                    disabled={saveLoading}
+                  <div
+                    onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white cursor-pointer flex justify-between items-center"
                   >
-                    <option value="">Select Subject</option>
-                    {subjects.map((subject) => (
-                      <option key={subject.id} value={subject.id}>{subject.name}</option>
-                    ))}
-                  </select>
+                    <span>{selectedSubjectName}</span>
+                    <span className="text-xs text-gray-400">▼</span>
+                  </div>
+
+                  {isSubjectDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-slate-800 border border-slate-600 rounded shadow-lg z-50 max-h-56 overflow-y-auto p-2">
+                      <div className="flex items-center gap-2 bg-slate-700 px-2 py-1 rounded mb-2 border border-slate-600">
+                        <Search className="h-4 w-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search subject..."
+                          value={subjectSearch}
+                          onChange={(e) => setSubjectSearch(e.target.value)}
+                          className="w-full bg-transparent text-sm text-white focus:outline-none"
+                          autoFocus
+                        />
+                      </div>
+                      {filteredSubjects.length > 0 ? (
+                        filteredSubjects.map((sub) => (
+                          <div
+                            key={sub.id}
+                            onClick={() => {
+                              setForm({ ...form, subject_id: sub.id });
+                              setIsSubjectDropdownOpen(false);
+                            }}
+                            className={`px-3 py-2 rounded text-sm cursor-pointer hover:bg-slate-700 ${
+                              form.subject_id == sub.id ? "bg-blue-600/30 text-blue-300" : "text-gray-200"
+                            }`}
+                          >
+                            {sub.name}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-gray-400 text-center py-2">No subjects found</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -422,8 +470,10 @@ export default function LiveClass() {
                     disabled={saveLoading}
                   >
                     <option value="">Select Teacher</option>
-                    {employees.map((employee) => (
-                      <option key={employee.id} value={employee.id}>{employee.name}</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {`${emp.first_name || ''} ${emp.last_name || ''}`.trim() || emp.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -481,9 +531,7 @@ export default function LiveClass() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Meeting ID
-                  </label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Meeting ID</label>
                   <input
                     type="text"
                     placeholder="Enter meeting ID"
@@ -495,9 +543,7 @@ export default function LiveClass() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Meeting Password
-                  </label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Meeting Password</label>
                   <input
                     type="text"
                     placeholder="Enter meeting password"
@@ -541,9 +587,7 @@ export default function LiveClass() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Max Participants
-                  </label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Max Participants</label>
                   <input
                     type="number"
                     placeholder="Enter max participants"
@@ -555,9 +599,7 @@ export default function LiveClass() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Status
-                  </label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
                   <select
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value })}
@@ -588,9 +630,7 @@ export default function LiveClass() {
 
               {form.recurring && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Recurrence Pattern
-                  </label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Recurrence Pattern</label>
                   <input
                     type="text"
                     placeholder="e.g., Weekly, Bi-weekly, Monthly"
@@ -661,11 +701,13 @@ export default function LiveClass() {
               <div className="grid grid-cols-2 gap-4 p-4 bg-slate-700/30 rounded-lg">
                 <div>
                   <p className="text-sm text-gray-400">Teacher</p>
-                  <p className="text-white">{selectedLiveClass.employee?.name || "N/A"}</p>
+                  <p className="text-white">
+                    {selectedLiveClass.employee ? `${selectedLiveClass.employee.first_name || ''} ${selectedLiveClass.employee.last_name || ''}`.trim() || selectedLiveClass.employee.name : "N/A"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-400">Session</p>
-                  <p className="text-white">{selectedLiveClass.schoolSession?.name || "N/A"}</p>
+                  <p className="text-white">{selectedLiveClass.schoolSession?.name || selectedLiveClass.school_session?.name || "N/A"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-400">Start Time</p>
@@ -703,29 +745,6 @@ export default function LiveClass() {
                   {selectedLiveClass.meeting_password && (
                     <p className="text-sm text-gray-400">Password: {selectedLiveClass.meeting_password}</p>
                   )}
-                </div>
-              )}
-
-              {selectedLiveClass.recurring && (
-                <div className="p-4 bg-slate-700/30 rounded-lg">
-                  <p className="text-sm text-gray-400">Recurring Class</p>
-                  <p className="text-white">{selectedLiveClass.recurrence_pattern || "Yes"}</p>
-                </div>
-              )}
-
-              {selectedLiveClass.assignments && selectedLiveClass.assignments.length > 0 && (
-                <div>
-                  <p className="text-sm text-gray-400 mb-2">Assignments ({selectedLiveClass.assignments.length})</p>
-                  <div className="bg-slate-700/30 p-4 rounded-lg max-h-48 overflow-y-auto">
-                    {selectedLiveClass.assignments.map((assignment, index) => (
-                      <div key={index} className="flex justify-between items-center py-2 border-b border-slate-600 last:border-0">
-                        <span className="text-gray-300">{assignment.title}</span>
-                        <span className={`text-sm ${assignment.status === 'published' ? 'text-green-400' : 'text-yellow-400'}`}>
-                          {assignment.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               )}
             </div>

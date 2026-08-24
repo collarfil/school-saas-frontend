@@ -7,51 +7,103 @@ import { Edit, Trash2, Plus } from "lucide-react";
 export default function ExamType() {
   const [examTypes, setExamTypes] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [sessions, setSessions] = useState([]);
 
   const [form, setForm] = useState({
     name: "",
     slug: "",
-    school_id: "",
     school_session_id: ""
   });
+
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
 
-  const getContextIds = () => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    const activeSession = JSON.parse(localStorage.getItem('active_session'));
-    return {
-      schoolId: user?.school?.id || user?.school_id,
-      schoolSessionId: activeSession?.id || user?.school_session_id
-    };
+  // Safely extract context from user profile or local storage
+  const getStoredUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
   };
 
-  const fetchAll = async () => {
-    setLoading(true);
-    const { schoolId, schoolSessionId } = getContextIds();
-    
-    if (!schoolId || !schoolSessionId) {
-      toast.error("Active context values missing. Please check your session.");
-      setLoading(false);
-      return;
-    }
+  const user = getStoredUser();
+  const schoolId = user?.school_id || user?.school?.id;
 
+  // 1. Fetch academic sessions safely
+  const fetchSessions = async () => {
     try {
-      const response = await api.get("/CBT/exam-types", { 
-        params: { school_id: schoolId, school_session_id: schoolSessionId } 
+      const response = await api.get("/school-sessions");
+      
+      // Defensively parse array from common Laravel response structures
+      let sessionList = [];
+      if (Array.isArray(response.data)) {
+        sessionList = response.data;
+      } else if (Array.isArray(response.data?.data)) {
+        sessionList = response.data.data;
+      } else if (Array.isArray(response.data?.data?.data)) {
+        sessionList = response.data.data.data;
+      }
+
+      setSessions(sessionList);
+
+      // Auto-select active session if available
+      const active = sessionList.find(s => s.is_active || s.status === 'active');
+      if (active) {
+        setForm(prev => ({ ...prev, school_session_id: active.id }));
+      }
+      return sessionList;
+    } catch (err) {
+      console.warn("Could not load sessions automatically:", err);
+      setSessions([]);
+      return [];
+    }
+  };
+
+  // 2. Fetch Exam Types with required school & session parameters
+  const fetchAll = async (currentSessionId) => {
+    setLoading(true);
+    try {
+      const targetSessionId = currentSessionId || form.school_session_id;
+
+      // Pass query parameters to satisfy backend 422 validation
+      const response = await api.get("/cbt/exam-types", {
+        params: {
+          school_id: schoolId,
+          school_session_id: targetSessionId || undefined
+        }
       });
-      setExamTypes(response.data?.data || response.data || []);
+
+      let list = [];
+      if (Array.isArray(response.data)) {
+        list = response.data;
+      } else if (Array.isArray(response.data?.data)) {
+        list = response.data.data;
+      }
+
+      setExamTypes(list);
     } catch (err) {
       console.error("❌ Fetch error:", err);
-      toast.error("Failed to fetch CBT configurations");
+      // Don't show toast error on initial mount if it was just missing parameter selection
+      if (err.response?.status !== 422) {
+        toast.error("Failed to fetch CBT exam types");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAll();
+    const initData = async () => {
+      const sessionList = await fetchSessions();
+      const active = sessionList.find(s => s.is_active || s.status === 'active');
+      const activeId = active ? active.id : sessionList[0]?.id;
+      
+      fetchAll(activeId);
+    };
+
+    initData();
   }, []);
 
   const generateSlug = (text) => {
@@ -74,44 +126,43 @@ export default function ExamType() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSaveLoading(true);
-    
-    const { schoolId, schoolSessionId } = getContextIds();
-    if (!schoolId || !schoolSessionId) {
-      toast.error("Missing valid runtime parameter context keys.");
-      setSaveLoading(false);
+
+    if (!form.name.trim()) {
+      toast.error("Assessment name is required");
       return;
     }
+
+    if (!form.school_session_id) {
+      toast.error("Please select an academic session");
+      return;
+    }
+
+    setSaveLoading(true);
 
     try {
       const payload = {
         name: form.name,
         slug: form.slug,
         school_id: schoolId,
-        school_session_id: schoolSessionId
+        school_session_id: form.school_session_id
       };
 
       if (editId) {
-        await api.put(`/CBT/exam-types/${editId}`, payload);
-        toast.success("Exam type context updated successfully");
+        await api.put(`/cbt/exam-types/${editId}`, payload);
+        toast.success("Exam type updated successfully");
       } else {
-        await api.post("/CBT/exam-types", payload);
-        toast.success("Exam type ruleset registered successfully");
+        await api.post("/cbt/exam-types", payload);
+        toast.success("Exam type created successfully");
       }
-      
-      setShowModal(false);
-      resetForm();
-      await fetchAll();
+
+      closeModal();
+      await fetchAll(form.school_session_id);
     } catch (error) {
-      console.error("❌ Save configuration error:", error);
+      console.error("❌ Save error:", error);
       if (error.response?.data?.errors) {
-        Object.values(error.response.data.errors).forEach(messages => {
-          messages.forEach(message => toast.error(message));
-        });
-      } else if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
+        Object.values(error.response.data.errors).flat().forEach(msg => toast.error(msg));
       } else {
-        toast.error("Failed to map CBT blueprint entry parameters.");
+        toast.error(error.response?.data?.message || "Failed to save exam type");
       }
     } finally {
       setSaveLoading(false);
@@ -119,37 +170,35 @@ export default function ExamType() {
   };
 
   const handleEdit = (type) => {
-    const { schoolId, schoolSessionId } = getContextIds();
     setForm({
       name: type.name || "",
       slug: type.slug || "",
-      school_id: schoolId,
-      school_session_id: schoolSessionId
+      school_session_id: type.school_session_id || ""
     });
     setEditId(type.id);
     setShowModal(true);
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to drop this CBT configuration blueprint?")) return;
-    
+    if (!confirm("Are you sure you want to delete this exam type?")) return;
+
     try {
-      await api.delete(`/CBT/exam-types/${id}`);
-      toast.success("Blueprint rule entry securely purged.");
-      fetchAll();
+      await api.delete(`/cbt/exam-types/${id}`);
+      toast.success("Exam type deleted successfully.");
+      fetchAll(form.school_session_id);
     } catch (error) {
       console.error("❌ Delete error:", error);
-      toast.error("Failed to drop selected exam type configuration matrix.");
+      toast.error("Failed to delete exam type.");
     }
   };
 
   const resetForm = () => {
-    const { schoolId, schoolSessionId } = getContextIds();
+    const sessionList = Array.isArray(sessions) ? sessions : [];
+    const active = sessionList.find(s => s.is_active || s.status === 'active');
     setForm({
       name: "",
       slug: "",
-      school_id: schoolId,
-      school_session_id: schoolSessionId
+      school_session_id: active ? active.id : (sessionList[0]?.id || "")
     });
     setEditId(null);
   };
@@ -159,23 +208,21 @@ export default function ExamType() {
     resetForm();
   };
 
-  const handleOpenModal = () => {
-    resetForm();
-    setShowModal(true);
-  };
-
   const tableColumns = [
     { header: "#", accessor: "index", width: "80px" },
-    { header: "Assessment Name", accessor: "name", width: "400px" },
-    { header: "System Routing Slug", accessor: "slug", width: "400px" },
+    { header: "Assessment Name", accessor: "name", width: "300px" },
+    { header: "Slug Path", accessor: "slug", width: "250px" },
+    { header: "Academic Session", accessor: "session_name", width: "200px" },
   ];
 
   const getTableData = () => {
-    return examTypes.map((type, index) => ({
+    const list = Array.isArray(examTypes) ? examTypes : [];
+    return list.map((type, index) => ({
       id: type.id,
       index: index + 1,
       name: type.name,
       slug: type.slug,
+      session_name: type.school_session?.name || type.school_session?.session_name || type.school_session_id || "N/A",
       original: type
     }));
   };
@@ -191,25 +238,20 @@ export default function ExamType() {
     </div>
   );
 
-  const handleTableSearch = (data, term) => {
-    const lowerTerm = term.toLowerCase();
-    return data.filter(item => 
-      item.name?.toLowerCase().includes(lowerTerm) ||
-      item.slug?.toLowerCase().includes(lowerTerm)
-    );
-  };
+  // Safe array reference for select render
+  const safeSessions = Array.isArray(sessions) ? sessions : [];
 
   return (
     <div className="text-white p-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold uppercase tracking-wider">CBT Classification Modules</h2>
+        <h2 className="text-2xl font-bold uppercase tracking-wider">CBT Exam Types</h2>
         <button
-          onClick={handleOpenModal}
-          className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition-colors font-medium flex items-center gap-2"
+          onClick={() => { resetForm(); setShowModal(true); }}
+          className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
           disabled={loading}
         >
           <Plus className="h-4 w-4" />
-          {loading ? "Loading..." : "Add Blueprint"}
+          Add Exam Type
         </button>
       </div>
 
@@ -217,46 +259,66 @@ export default function ExamType() {
         columns={tableColumns}
         data={getTableData()}
         loading={loading}
-        title="Active Exam Types Matrix"
-        searchPlaceholder="Search category elements by name or routing signature..."
-        onSearch={handleTableSearch}
+        title="Exam Types Configuration"
         actions={renderTableActions}
       />
 
       {showModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50 p-4">
-          <div className="bg-slate-800 p-6 rounded-lg w-full max-w-md border border-slate-700 max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-800 p-6 rounded-lg w-full max-w-md border border-slate-700">
             <h3 className="text-xl font-semibold mb-4 text-blue-400">
-              {editId ? "Modify Blueprint Parameters" : "Establish New CBT Layout"}
+              {editId ? "Edit Exam Type" : "New Exam Type"}
             </h3>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Academic Session Selector */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Assessment Name <span className="text-red-400">*</span>
+                  Academic Session <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={form.school_session_id}
+                  onChange={(e) => {
+                    const selectedSession = e.target.value;
+                    setForm({ ...form, school_session_id: selectedSession });
+                    fetchAll(selectedSession);
+                  }}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white outline-none focus:border-blue-500"
+                  required
+                >
+                  <option value="">-- Select Academic Session --</option>
+                  {safeSessions.map((sess) => (
+                    <option key={sess.id} value={sess.id}>
+                      {sess.name || sess.session_name || sess.year || `Session #${sess.id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Exam Type Name <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g., First Term Continuous Assessment"
+                  placeholder="e.g., First Term Examination"
                   value={form.name}
                   onChange={handleNameChange}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 outline-none"
                   required
-                  disabled={saveLoading}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Routing Slug Reference <span className="text-red-400">*</span>
+                  Slug
                 </label>
                 <input
                   type="text"
-                  placeholder="auto-generated-url-path"
+                  placeholder="first-term-examination"
                   value={form.slug}
                   onChange={(e) => setForm({ ...form, slug: generateSlug(e.target.value) })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-mono"
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white font-mono placeholder-gray-400 focus:border-blue-500 outline-none"
                   required
-                  disabled={saveLoading}
                 />
               </div>
 
@@ -264,17 +326,17 @@ export default function ExamType() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500 disabled:bg-gray-400 transition-colors font-medium"
+                  className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500 transition-colors"
                   disabled={saveLoading}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:bg-blue-400 transition-colors font-medium"
+                  className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 transition-colors"
                   disabled={saveLoading}
                 >
-                  {saveLoading ? "Saving Structural Parameters..." : (editId ? "Update" : "Save")}
+                  {saveLoading ? "Saving..." : (editId ? "Update" : "Save")}
                 </button>
               </div>
             </form>
