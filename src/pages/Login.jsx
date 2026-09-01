@@ -119,8 +119,8 @@ const res = await api.post("/auth/login", form);
       <div className="w-full max-w-[420px] mx-auto text-center">
         <div className="flex flex-col items-center mb-8">
           <img
-            src="/images/school-logo 2.png"
-            alt="School Logo"
+            src="/images/badge2.png"
+            alt="Badge"
             className="h-24 mb-3 drop-shadow-lg"
           />
           <h1 className="text-2xl font-bold text-white tracking-wide">

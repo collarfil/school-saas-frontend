@@ -27,11 +27,11 @@ import {
   CalendarDays,
   GraduationCap,
   DollarSign,
-  // ADD MISSING IMPORTS
-  MessageCircle,  // For Live Chat
-  Edit,           // For Whiteboard
-  UserPlus,       // For Admissions
-  Settings        // For Settings (if needed)
+  MessageCircle,
+  Edit,
+  UserPlus,
+  Settings,
+  Globe
 } from "lucide-react";
 import api from '../api/axios';
 
@@ -122,8 +122,11 @@ export default function Sidebar() {
           requiresSubscription: false,
           submenus: [
             { name: "Subscription", path: "/school/subscriptions", icon: <Crown className="w-4 h-4" /> },
-            { name: "Fees", path: "/school/fees", icon: <Wallet className="w-4 h-4" />, requiresSubscription: true },
-            { name: "Fee Payment", path: "/school/feepayments", icon: <CreditCard className="w-4 h-4" />, requiresSubscription: true },
+            { name: "Fee Setup (Offline)", path: "/school/fees", icon: <Wallet className="w-4 h-4" />, requiresSubscription: true },
+            { name: "Fee Setup (Online)", path: "/school/onlinefees", icon: <Wallet className="w-4 h-4" />, requiresSubscription: true },
+            { name: "Online Fee Payment", path: "/school/online-fee-payments", icon: <CreditCard className="w-4 h-4" />, requiresSubscription: true },
+            { name: "Online Gateway Setup", path: "/school/online-payments", icon: <Globe className="w-4 h-4" />, requiresSubscription: true },
+            { name: "Offline Fee Payment", path: "/school/feepayments", icon: <Receipt className="w-4 h-4" />, requiresSubscription: true },
             { name: "Transaction", path: "/school/transactions", icon: <ShoppingBag className="w-4 h-4" />, requiresSubscription: true },
             { name: "Income", path: "/school/incomes", icon: <TrendingUp className="w-4 h-4" />, requiresSubscription: true },
             { name: "Expense", path: "/school/expenses", icon: <TrendingDown className="w-4 h-4" />, requiresSubscription: true },
@@ -157,7 +160,7 @@ export default function Sidebar() {
             { name: "Recordings", path: "/school/recordings", icon: <Video className="w-4 h-4" /> },
             { name: "Meetings", path: "/school/meetings", icon: <CalendarDays className="w-4 h-4" /> },
             { name: "Meeting Participants", path: "/school/meeting-participants", icon: <Users className="w-4 h-4" /> },
-            { name: "Polls", path: "/school/polls", icon: <ClipboardList className="w-4 h-4" /> },
+            { name: "Poll", path: "/school/poll", icon: <ClipboardList className="w-4 h-4" /> },
             { name: "Poll Responses", path: "/school/poll-responses", icon: <Users className="w-4 h-4" /> },
             { name: "Live Chat", path: "/school/live-chats", icon: <MessageCircle className="w-4 h-4" /> },
             { name: "Whiteboard", path: "/school/whiteboards", icon: <Edit className="w-4 h-4" /> },
@@ -175,9 +178,9 @@ export default function Sidebar() {
             { name: "Questions", path: "/school/questions", icon: <Grid className="w-4 h-4" /> },
             { name: 'Exam Sessions', path: "/school/exam-sessions", icon: <Calendar className="w-4 h-4" /> },
             { name: 'Exam Grades', path: "/school/exam-grades", icon: <ClipboardList className="w-4 h-4" /> },
-            {name: 'Student Responses', path: "/school/student-responses", icon: <Users className="w-4 h-4" /> },
+            { name: 'Student Responses', path: "/school/student-responses", icon: <Users className="w-4 h-4" /> },
             { name: 'Exam Results', path: "/school/exam-results", icon: <FileText className="w-4 h-4" /> },
-            {name: 'Options', path: "/school/exam-options", icon: <Settings className="w-4 h-4" /> }, 
+            { name: 'Options', path: "/school/exam-options", icon: <Settings className="w-4 h-4" /> }, 
           ]
         },
         {
@@ -252,7 +255,9 @@ export default function Sidebar() {
           requiresSubscription: false,
           submenus: [
             { name: "Subscription", path: "/school/subscriptions", icon: <Crown className="w-4 h-4" /> },
-            { name: "Fees", path: "/account/fees", icon: <Wallet className="w-4 h-4" />, requiresSubscription: true },
+            { name: "Fee Setup (Offline)", path: "/account/fees", icon: <Wallet className="w-4 h-4" />, requiresSubscription: true },
+            { name: "Online Fee Payment", path: "/account/online-fee-payments", icon: <CreditCard className="w-4 h-4" />, requiresSubscription: true },
+            { name: "Online Gateway Setup", path: "/account/online-payments", icon: <Globe className="w-4 h-4" />, requiresSubscription: true },
             { name: "Fee Payment", path: "/account/feepayments", icon: <CreditCard className="w-4 h-4" />, requiresSubscription: true },
             { name: "Transaction", path: "/account/transactions", icon: <ShoppingBag className="w-4 h-4" />, requiresSubscription: true },
             { name: "Income", path: "/account/incomes", icon: <TrendingUp className="w-4 h-4" />, requiresSubscription: true },
@@ -271,6 +276,14 @@ export default function Sidebar() {
           icon: <Home className="w-4 h-4" />,
           path: '/student/dashboard',
           type: 'single',
+          requiresSubscription: true
+        },
+        {
+          id: 'financials',
+          title: 'Fee Payments',
+          icon: <CreditCard className="w-4 h-4" />,
+          type: 'single',
+          path: '/student/fees',
           requiresSubscription: true
         },
         {
@@ -296,6 +309,14 @@ export default function Sidebar() {
           icon: <Home className="w-4 h-4" />,
           path: '/parent/dashboard',
           type: 'single',
+          requiresSubscription: true
+        },
+        {
+          id: 'financials',
+          title: 'Pay School Fees',
+          icon: <CreditCard className="w-4 h-4" />,
+          type: 'single',
+          path: '/parent/fees',
           requiresSubscription: true
         },
         {
@@ -362,38 +383,24 @@ export default function Sidebar() {
   };
 
   const canAccessMenuItem = (menu) => {
-    // Super admin always has access
     if (user.role === 'super_admin') return true;
-    
-    // Admin always sees all menus (even without subscription)
     if (user.role === 'admin') return true;
-    
-    // For other roles, check subscription
     if (!menu.requiresSubscription) return true;
     return hasActiveSubscription;
   };
 
   const canAccessSubmenu = (submenu) => {
-    // Super admin always has access
     if (user.role === 'super_admin') return true;
-    
-    // Admin always sees all submenus
     if (user.role === 'admin') return true;
-    
-    // For other roles, check subscription
     if (!submenu.requiresSubscription) return true;
     return hasActiveSubscription;
   };
 
   const handleMenuClick = (menu, submenu = null) => {
-    const targetPath = submenu ? submenu.path : menu.path;
     const requiresSub = submenu ? submenu.requiresSubscription : menu.requiresSubscription;
-    
-    // Super admin and admin bypass subscription checks for viewing
     if (['super_admin', 'admin'].includes(user.role)) return true;
     
     if (requiresSub && !hasActiveSubscription) {
-      // Redirect to subscription page
       navigate('/school/subscriptions');
       return false;
     }

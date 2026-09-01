@@ -14,15 +14,12 @@ const Home = () => {
         const res = await axios.get('http://localhost:8000/api/register/check-super-admin');
         
         if (res.data.super_admin_exists) {
-          // Super admin exists, show the normal home page
           return;
         } else {
-          // No super admin exists, redirect to super admin registration
           navigate('/register/super-admin');
         }
       } catch (err) {
         console.error('System status check failed:', err);
-        // If check fails, show the normal home page but log the error
         console.log('Showing home page despite check failure');
       }
     };
@@ -31,7 +28,7 @@ const Home = () => {
   }, [navigate]);
 
   return (
-    <div className="relative min-h-screen bg-black text-white overflow-hidden">
+    <div className="fixed inset-0 bg-black text-white overflow-hidden">
       {/* Background Image */}
       <div
         className="absolute inset-0 bg-cover bg-center opacity-60"
@@ -45,7 +42,7 @@ const Home = () => {
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black"></div>
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center">
+      <div className="relative z-10 flex flex-col items-center justify-center h-full w-full px-6 text-center">
         <motion.h1
           className="text-5xl md:text-6xl font-extrabold mb-4"
           initial={{ opacity: 0, y: 20 }}

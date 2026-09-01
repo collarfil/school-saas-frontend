@@ -8,11 +8,17 @@ import {
   TrendingUp,
   Award,
   Shield,
-  LogOut
+  Phone,
+  LogOut,
+  Video
 } from 'lucide-react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+
+// ⚠️ Temporarily commented out until these component files are created in src/components/
+// import MessagingComponent from '../components/MessagingComponent';
+// import WhatsAppMessaging from '../components/WhatsAppMessaging';
 
 export default function ParentDashboard() {
   const navigate = useNavigate();
@@ -25,6 +31,11 @@ export default function ParentDashboard() {
     feeStatus: 'Paid',
     outstandingBalance: 0
   });
+
+  // State for modals and chat
+  const [showChat, setShowChat] = useState(false);
+  const [showWhatsApp, setShowWhatsApp] = useState(false);
+  const [selectedConversation, setSelectedConversation] = useState(null);
 
   // Logout function
   const handleLogout = () => {
@@ -50,7 +61,7 @@ export default function ParentDashboard() {
         api.get('/attendances/children-attendance'),
         api.get('/fee-payments/children-balance')
       ]);
-      
+
       setChildren(childrenRes.data?.children || []);
       setStats({
         totalChildren: childrenRes.data?.count || 0,
@@ -109,48 +120,6 @@ export default function ParentDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-gray-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        // Add to header section of each dashboard
-      <div className="flex items-center space-x-3">
-        <button
-          onClick={() => setShowChat(true)}
-          className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
-          title="Chat"
-        >
-          <Users className="h-5 w-5" />
-        </button>
-        <button
-          onClick={() => setShowWhatsApp(true)}
-          className="p-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
-          title="WhatsApp"
-        >
-          <Phone className="h-5 w-5" />
-        </button>
-        {user?.role === 'admin' && (
-          <button
-            onClick={() => navigate('/video-classes')}
-            className="p-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-            title="Video Classes"
-          >
-            <Video className="h-5 w-5" />
-          </button>
-        )}
-      </div>
-
-      // Add state at top of component
-      const [showChat, setShowChat] = useState(false);
-      const [showWhatsApp, setShowWhatsApp] = useState(false);
-      const [selectedConversation, setSelectedConversation] = useState(null);
-
-      // Add modals at bottom
-      {showChat && (
-        <MessagingComponent
-          conversationId={selectedConversation}
-          onClose={() => setShowChat(false)}
-        />
-      )}
-      {showWhatsApp && (
-        <WhatsAppMessaging onClose={() => setShowWhatsApp(false)} />
-      )}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
@@ -162,6 +131,33 @@ export default function ParentDashboard() {
               </p>
             </div>
             <div className="flex items-center space-x-4">
+              {/* Quick Action Buttons */}
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => setShowChat(true)}
+                  className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-white"
+                  title="Chat"
+                >
+                  <Users className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => setShowWhatsApp(true)}
+                  className="p-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors text-white"
+                  title="WhatsApp"
+                >
+                  <Phone className="h-5 w-5" />
+                </button>
+                {user?.role === 'admin' && (
+                  <button
+                    onClick={() => navigate('/video-classes')}
+                    className="p-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors text-white"
+                    title="Video Classes"
+                  >
+                    <Video className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
+
               <div className="bg-purple-500/20 border border-purple-500/30 px-4 py-2 rounded-lg">
                 <p className="text-purple-300 font-medium">Parent</p>
               </div>
@@ -171,7 +167,7 @@ export default function ParentDashboard() {
               {/* Logout Button */}
               <button
                 onClick={handleLogout}
-                className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors text-white"
               >
                 <LogOut className="h-4 w-4" />
                 <span>Logout</span>
@@ -287,7 +283,10 @@ export default function ParentDashboard() {
               <p className="text-gray-300 text-sm mb-4">
                 {action.description}
               </p>
-              <button className="text-blue-400 hover:text-blue-300 text-sm font-medium">
+              <button 
+                onClick={() => navigate(action.path)}
+                className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+              >
                 Access →
               </button>
             </div>
@@ -310,6 +309,37 @@ export default function ParentDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Temporary Modal Placeholders */}
+      {showChat && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 max-w-md w-full text-white">
+            <h3 className="text-lg font-bold mb-2">Chat Feature</h3>
+            <p className="text-gray-300 text-sm mb-4">MessagingComponent is under construction or not found.</p>
+            <button 
+              onClick={() => setShowChat(false)}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showWhatsApp && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 max-w-md w-full text-white">
+            <h3 className="text-lg font-bold mb-2">WhatsApp Feature</h3>
+            <p className="text-gray-300 text-sm mb-4">WhatsAppMessaging component is under construction or not found.</p>
+            <button 
+              onClick={() => setShowWhatsApp(false)}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

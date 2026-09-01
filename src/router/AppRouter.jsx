@@ -44,6 +44,8 @@ import Subject from "../pages/Subject";
 import Parent from "../pages/Parent";
 import Employee from "../pages/Employee";
 import Fee from "../pages/Fee";
+import OnlineFeePayment from "../pages/OnlineFeePayment"; // ONLINE FEE CHECKOUT FOR STUDENTS & PARENTS
+import OnlinePayment from "../pages/OnlinePayment"; // GATEWAY MANAGEMENT FOR ADMIN / ACCOUNT STAFF
 import FeePayment from "../pages/FeePayment";
 import Transaction from "../pages/Transaction";
 import Subscription from "../pages/Subscription";
@@ -64,7 +66,7 @@ import Recording from "../pages/Recording";
 import Poll from "../pages/Poll";
 import PollResponse from "../pages/PollResponse";
 import Whiteboard from "../pages/Whiteboard";
-import ClassAttendance from "../pages/ClassAttendance"; // Fixed typo: ClassAttendannce -> ClassAttendance
+import ClassAttendance from "../pages/ClassAttendance";
 import Meeting from "../pages/Meeting";
 import MeetingParticipant from "../pages/MeetingParticipant";
 
@@ -129,6 +131,9 @@ const schoolPages = [
   ["parents", Parent],
   ["employees", Employee],
   ["fees", Fee],
+  ["onlinefees", OnlineFeePayment],           // Fixed: Route alias for sidebar link /school/onlinefees
+  ["online-fee-payments", OnlineFeePayment],  // Route alias for /school/online-fee-payments
+  ["online-payments", OnlinePayment],         // Gateway Setup
   ["feepayments", FeePayment],
   ["transactions", Transaction],
   ["incomes", Income],
@@ -145,13 +150,13 @@ const schoolPages = [
   ["live-classes", LiveClass],
   ["live-chats", LiveChat],
   ["recordings", Recording],
-  ["polls", Poll],
+  ["poll", Poll],
   ["poll-responses", PollResponse],
   ["whiteboards", Whiteboard],
   ["class-attendances", ClassAttendance],
   ["meetings", Meeting],
   ["meeting-participants", MeetingParticipant],
-  // ✅ Clean CBT Page References:
+  // CBT Page References
   ["exam-sessions", ExamSession],
   ["exam-grades", ExamGrade],
   ["exam-results", ExamResult],
@@ -160,10 +165,6 @@ const schoolPages = [
   ["exam-options", Option],
   ["exams", Exam],
   ["questions", Question],
-  
-  
-  
-
 ];
 
 /* =======================
@@ -361,6 +362,22 @@ const router = createBrowserRouter(
           ),
         },
         {
+          path: "/account/online-fee-payments",
+          element: (
+            <ProtectedRoute requiredRole="employee" requireSubscription>
+              <OnlineFeePayment />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/account/online-payments",
+          element: (
+            <ProtectedRoute requiredRole="employee" requireSubscription>
+              <OnlinePayment />
+            </ProtectedRoute>
+          ),
+        },
+        {
           path: "/account/feepayments",
           element: (
             <ProtectedRoute requiredRole="employee" requireSubscription>
@@ -431,7 +448,15 @@ const router = createBrowserRouter(
           path: "/student/fees",
           element: (
             <ProtectedRoute requiredRole="student" requireSubscription>
-              <FeePayment />
+              <OnlineFeePayment />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/student/pay-fees",
+          element: (
+            <ProtectedRoute requiredRole="student" requireSubscription>
+              <OnlineFeePayment />
             </ProtectedRoute>
           ),
         },
@@ -490,7 +515,15 @@ const router = createBrowserRouter(
           path: "/parent/fees",
           element: (
             <ProtectedRoute requiredRole="parent" requireSubscription>
-              <FeePayment />
+              <OnlineFeePayment />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/parent/pay-fees",
+          element: (
+            <ProtectedRoute requiredRole="parent" requireSubscription>
+              <OnlineFeePayment />
             </ProtectedRoute>
           ),
         },

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import api from "../api/axios";
 import toast from "react-hot-toast";
 import DataTable from "../components/DataTable";
-import { Search, User, DollarSign, Calendar, Check, ChevronDown, X, Layers, FileText, CreditCard, Hash, Loader } from "lucide-react";
+import { Search, User, DollarSign, Calendar, ChevronDown, X, FileText, CreditCard, Hash, Loader, ExternalLink } from "lucide-react";
 
 export default function FeePayment() {
   const [payments, setPayments] = useState([]);
@@ -35,26 +35,29 @@ export default function FeePayment() {
   const feeRef = useRef(null);
 
   const statusOptions = [
-    { value: "paid", label: "Paid", color: "text-green-400 bg-green-500/10" },
-    { value: "pending", label: "Pending", color: "text-yellow-400 bg-yellow-500/10" },
-    { value: "failed", label: "Failed", color: "text-red-400 bg-red-500/10" }
+    { value: "paid", label: "Paid" },
+    { value: "pending", label: "Pending" },
+    { value: "failed", label: "Failed" }
   ];
 
   const paymentMethodOptions = [
-    { value: "cash", label: "Cash", icon: DollarSign },
-    { value: "bank_transfer", label: "Bank Transfer", icon: FileText },
-    { value: "card", label: "Card", icon: CreditCard },
-    { value: "paystack", label: "Paystack", icon: CreditCard },
-    { value: "manual", label: "Manual", icon: User },
-    { value: "other", label: "Other", icon: DollarSign }
+    { value: "cash", label: "Cash (Offline)", icon: DollarSign },
+    { value: "bank_transfer", label: "Bank Transfer (Offline)", icon: FileText },
+    { value: "paystack", label: "Paystack (Online Gateway)", icon: CreditCard },
+    { value: "stripe", label: "Stripe (Online Gateway)", icon: CreditCard },
+    { value: "flutterwave", label: "Flutterwave (Online Gateway)", icon: CreditCard },
+    { value: "manual", label: "Manual Entry", icon: User }
   ];
 
   const getSchoolId = () => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    return user?.school?.id || user?.school_id || null;
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      return user?.school?.id || user?.school_id || null;
+    } catch {
+      return null;
+    }
   };
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (studentRef.current && !studentRef.current.contains(event.target)) {
@@ -68,7 +71,6 @@ export default function FeePayment() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Load payments data
   const loadPayments = async () => {
     setLoading(true);
     const schoolId = getSchoolId();
@@ -110,7 +112,6 @@ export default function FeePayment() {
     }
   };
 
-  // Load students and fees
   const loadStudentsAndFees = async () => {
     const schoolId = getSchoolId();
     if (!schoolId) return;
@@ -159,7 +160,6 @@ export default function FeePayment() {
     loadPayments();
   }, [groupByReference]);
 
-  // Filter students based on search
   const filteredStudents = students.filter((s) => {
     const name = s.name || s.full_name || "";
     const admissionNo = s.admission_no || s.admission_number || "";
@@ -167,7 +167,6 @@ export default function FeePayment() {
     return name.toLowerCase().includes(searchLower) || admissionNo.toLowerCase().includes(searchLower);
   }).slice(0, 10);
 
-  // Filter fees based on search
   const filteredFees = availableFees.filter((fee) => {
     const description = fee.description || "";
     const term = fee.term || "";
@@ -213,6 +212,8 @@ export default function FeePayment() {
     }, 0);
   };
 
+  const isOnlineMethod = (method) => ['paystack', 'stripe', 'flutterwave'].includes(method);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -228,9 +229,30 @@ export default function FeePayment() {
     
     setSaveLoading(true);
     const schoolId = getSchoolId();
-    const paymentReference = form.payment_reference || generatePaymentReference();
 
     try {
+      // ONLINE GATEWAY PATH
+      if (isOnlineMethod(form.payment_method)) {
+        toast.loading("Initializing online checkout...", { id: "online-pay" });
+        const response = await api.post("/transactions/online-initialize", {
+          school_id: schoolId,
+          student_id: form.student_id,
+          fee_ids: selectedFees,
+          payment_method: form.payment_method,
+          currency: "NGN"
+        });
+
+        if (response.data.status === 'success' && response.data.data?.checkout_url) {
+          toast.success("Redirecting to payment gateway...", { id: "online-pay" });
+          window.location.href = response.data.data.checkout_url;
+          return;
+        } else {
+          throw new Error("Checkout URL was not returned by gateway.");
+        }
+      }
+
+      // OFFLINE / MANUAL PATH
+      const paymentReference = form.payment_reference || generatePaymentReference();
       const response = await api.post("/fee-payments", {
         student_id: form.student_id,
         fee_ids: selectedFees,
@@ -244,7 +266,7 @@ export default function FeePayment() {
 
       if (response.data.status === 'success') {
         const { payment_reference, total_amount, payment_count } = response.data.data;
-        toast.success(`Payment recorded successfully! Reference: ${payment_reference}. Total: ₦${total_amount.toLocaleString()} (${payment_count} fees)`);
+        toast.success(`Payment recorded successfully! Ref: ${payment_reference}. Total: ₦${total_amount.toLocaleString()} (${payment_count} fees)`);
         closeModal();
         loadPayments();
       } else {
@@ -253,7 +275,7 @@ export default function FeePayment() {
       
     } catch (err) {
       console.error("❌ Save payment error:", err);
-      toast.error(err.response?.data?.message || "Failed to save payment");
+      toast.error(err.response?.data?.message || err.message || "Failed to process payment", { id: "online-pay" });
     } finally {
       setSaveLoading(false);
     }
@@ -300,11 +322,8 @@ export default function FeePayment() {
     return display;
   };
 
-  const formatCurrency = (amount) => {
-    return `₦${parseFloat(amount || 0).toLocaleString()}`;
-  };
+  const formatCurrency = (amount) => `₦${parseFloat(amount || 0).toLocaleString()}`;
 
-  // Table columns configuration
   const tableColumns = groupByReference ? [
     { header: "Reference", accessor: "payment_reference", width: "200px" },
     { header: "Student", accessor: "student_name", width: "250px" },
@@ -321,7 +340,6 @@ export default function FeePayment() {
     { header: "Status", accessor: "status", width: "100px" },
   ];
 
-  // Transform data for table display
   const getTableData = () => {
     if (groupByReference) {
       return payments.map(payment => ({
@@ -331,7 +349,7 @@ export default function FeePayment() {
         total_amount: formatCurrency(payment.total_amount || payment.amount_paid),
         payment_date: payment.payment_date ? new Date(payment.payment_date).toLocaleDateString() : 'N/A',
         status: payment.status,
-        payment_method: payment.payment_method
+        payment_method: payment.payment_method?.toUpperCase() || 'N/A'
       }));
     } else {
       return payments.map(payment => ({
@@ -346,20 +364,8 @@ export default function FeePayment() {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const statusClass = status === 'paid' ? 'bg-green-500/20 text-green-400' :
-                        status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-red-500/20 text-red-400';
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusClass}`}>
-        {status?.charAt(0).toUpperCase() + status?.slice(1)}
-      </span>
-    );
-  };
-
   return (
     <div className="p-6">
-      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white">Fee Payments</h1>
@@ -385,7 +391,6 @@ export default function FeePayment() {
         </div>
       </div>
 
-      {/* Data Table */}
       <DataTable
         columns={tableColumns}
         data={getTableData()}
@@ -401,16 +406,14 @@ export default function FeePayment() {
         }}
       />
 
-      {/* Payment Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-800 w-full max-w-2xl rounded-xl border border-slate-700 max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
             <div className="p-6 border-b border-slate-700">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-xl font-semibold text-white">Record Fee Payment</h2>
-                  <p className="text-gray-400 text-sm mt-1">Create lump sum payment for multiple fees</p>
+                  <p className="text-gray-400 text-sm mt-1">Create lump sum payment or initialize online gateway checkout</p>
                 </div>
                 <button onClick={closeModal} className="text-gray-400 hover:text-white">
                   <X className="h-6 w-6" />
@@ -418,10 +421,8 @@ export default function FeePayment() {
               </div>
             </div>
 
-            {/* Scrollable Form Content */}
             <div className="flex-1 overflow-y-auto p-6">
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Payment Reference */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Payment Reference
@@ -432,12 +433,12 @@ export default function FeePayment() {
                       type="text"
                       value={form.payment_reference}
                       onChange={(e) => setForm({ ...form, payment_reference: e.target.value })}
-                      className="w-full pl-10 pr-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                      disabled={isOnlineMethod(form.payment_method)}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 outline-none disabled:opacity-50"
                     />
                   </div>
                 </div>
 
-                {/* Student Selection - Working Dropdown */}
                 <div ref={studentRef}>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Select Student <span className="text-red-400">*</span>
@@ -455,7 +456,7 @@ export default function FeePayment() {
                           }}
                           onFocus={() => setShowStudentDropdown(true)}
                           placeholder="Search student by name or admission number..."
-                          className="w-full pl-10 pr-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                          className="w-full pl-10 pr-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:border-blue-500 outline-none"
                         />
                       </div>
                       <button
@@ -501,7 +502,6 @@ export default function FeePayment() {
                   )}
                 </div>
 
-                {/* Fee Selection - Working Dropdown with Checkboxes */}
                 <div ref={feeRef}>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Select Fees <span className="text-red-400">*</span>
@@ -520,7 +520,6 @@ export default function FeePayment() {
 
                     {showFeeDropdown && (
                       <div className="absolute z-10 mt-1 w-full bg-slate-700 border border-slate-600 rounded-lg shadow-lg max-h-80 overflow-y-auto">
-                        {/* Search within fees */}
                         <div className="p-3 border-b border-slate-600">
                           <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -571,16 +570,13 @@ export default function FeePayment() {
                   </div>
 
                   {selectedFees.length > 0 && (
-                    <div className="mt-3 p-3 bg-slate-700/50 rounded-lg">
-                      <div className="flex justify-between items-center font-semibold">
-                        <span className="text-white">Total:</span>
-                        <span className="text-lg text-white">{formatCurrency(calculateTotalAmount())}</span>
-                      </div>
+                    <div className="mt-3 p-3 bg-slate-700/50 rounded-lg flex justify-between items-center font-semibold">
+                      <span className="text-white">Total:</span>
+                      <span className="text-lg text-white">{formatCurrency(calculateTotalAmount())}</span>
                     </div>
                   )}
                 </div>
 
-                {/* Payment Details */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Payment Date</label>
@@ -590,20 +586,10 @@ export default function FeePayment() {
                         type="date"
                         value={form.payment_date}
                         onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
-                        className="w-full pl-10 pr-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 outline-none"
+                        disabled={isOnlineMethod(form.payment_method)}
+                        className="w-full pl-10 pr-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 outline-none disabled:opacity-50"
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Status</label>
-                    <select
-                      value={form.status}
-                      onChange={(e) => setForm({ ...form, status: e.target.value })}
-                      className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 outline-none"
-                    >
-                      {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                    </select>
                   </div>
 
                   <div>
@@ -616,9 +602,20 @@ export default function FeePayment() {
                       {paymentMethodOptions.map(method => <option key={method.value} value={method.value}>{method.label}</option>)}
                     </select>
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Status</label>
+                    <select
+                      value={form.status}
+                      onChange={(e) => setForm({ ...form, status: e.target.value })}
+                      disabled={isOnlineMethod(form.payment_method)}
+                      className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 outline-none disabled:opacity-50"
+                    >
+                      {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    </select>
+                  </div>
                 </div>
 
-                {/* Actions */}
                 <div className="flex justify-end gap-3 pt-4">
                   <button type="button" onClick={closeModal} className="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium">
                     Cancel
@@ -628,7 +625,13 @@ export default function FeePayment() {
                     disabled={saveLoading || !selectedStudent || selectedFees.length === 0}
                     className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    {saveLoading ? <><Loader className="h-5 w-5 animate-spin" /> Processing...</> : <><DollarSign className="h-5 w-5" /> Record Payment</>}
+                    {saveLoading ? (
+                      <><Loader className="h-5 w-5 animate-spin" /> Processing...</>
+                    ) : isOnlineMethod(form.payment_method) ? (
+                      <><ExternalLink className="h-5 w-5" /> Pay Online via Gateway</>
+                    ) : (
+                      <><DollarSign className="h-5 w-5" /> Record Payment</>
+                    )}
                   </button>
                 </div>
               </form>

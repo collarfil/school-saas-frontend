@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import api from "../api/axios";
 import toast from "react-hot-toast";
 import DataTable from "../components/DataTable";
-import { Edit, Trash2, Plus } from "lucide-react";
+import { Edit, Trash2, Plus, ChevronDown, Check, X } from "lucide-react";
 
 export default function Fee() {
   const [fees, setFees] = useState([]);
@@ -10,7 +10,7 @@ export default function Fee() {
   const [sessions, setSessions] = useState([]);
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ 
-    grade_id: "", 
+    grade_ids: [], 
     school_session_id: "", 
     term: "", 
     amount: "", 
@@ -20,13 +20,31 @@ export default function Fee() {
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [showGradeDropdown, setShowGradeDropdown] = useState(false);
+
+  const gradeDropdownRef = useRef(null);
 
   const terms = ['First Term', 'Second Term', 'Third Term'];
 
   const getSchoolId = () => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    return user?.school?.id || user?.school_id;
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      return user?.school?.id || user?.school_id || null;
+    } catch {
+      return null;
+    }
   };
+
+  // Close grade dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (gradeDropdownRef.current && !gradeDropdownRef.current.contains(event.target)) {
+        setShowGradeDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -45,13 +63,8 @@ export default function Fee() {
         api.get("/school-sessions", { params: { school_id: schoolId } })
       ]);
 
-      console.log("🔍 API Responses:", {
-        fees: feesRes.data,
-        grades: gradesRes.data,
-        sessions: sessionsRes.data
-      });
-
       const extractArray = (responseData) => {
+        if (!responseData) return [];
         if (Array.isArray(responseData)) return responseData;
         if (responseData?.status === 'success' && responseData?.data) {
           if (Array.isArray(responseData.data)) return responseData.data;
@@ -66,13 +79,9 @@ export default function Fee() {
         return [];
       };
 
-      const feesData = extractArray(feesRes.data);
-      const gradesData = extractArray(gradesRes.data);
-      const sessionsData = extractArray(sessionsRes.data);
-
-      setFees(feesData);
-      setGrades(gradesData);
-      setSessions(sessionsData);
+      setFees(extractArray(feesRes.data));
+      setGrades(extractArray(gradesRes.data));
+      setSessions(extractArray(sessionsRes.data));
 
     } catch (err) {
       console.error("❌ Fetch data error:", err);
@@ -95,11 +104,36 @@ export default function Fee() {
     fetchAllData();
   }, []);
 
-  const handleSubmit = async (e) => {
+  const toggleGrade = (gradeId) => {
+    setForm(prev => {
+      const exists = prev.grade_ids.includes(gradeId);
+      if (exists) {
+        return { ...prev, grade_ids: prev.grade_ids.filter(id => id !== gradeId) };
+      } else {
+        return { ...prev, grade_ids: [...prev.grade_ids, gradeId] };
+      }
+    });
+  };
+
+  const toggleAllGrades = () => {
+    if (form.grade_ids.length === grades.length) {
+      setForm(prev => ({ ...prev, grade_ids: [] }));
+    } else {
+      setForm(prev => ({ ...prev, grade_ids: grades.map(g => g.id) }));
+    }
+  };
+
+ const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (form.grade_ids.length === 0) {
+      toast.error("Please select at least one class");
+      return;
+    }
+
     setSaveLoading(true);
-    
     const schoolId = getSchoolId();
+
     if (!schoolId) {
       toast.error("No school ID found. Please login again.");
       setSaveLoading(false);
@@ -107,23 +141,64 @@ export default function Fee() {
     }
 
     try {
-      const payload = {
-        grade_id: parseInt(form.grade_id),
-        school_session_id: parseInt(form.school_session_id),
-        term: form.term,
-        amount: parseFloat(form.amount),
-        description: form.description,
-        school_id: schoolId
-      };
-
       if (editId) {
+        // Update single fee
+        const payload = {
+          grade_id: parseInt(form.grade_ids[0]),
+          school_session_id: parseInt(form.school_session_id),
+          term: form.term,
+          amount: parseFloat(form.amount),
+          description: form.description,
+          school_id: schoolId
+        };
         await api.put(`/fees/${editId}`, payload);
         toast.success("Fee updated successfully");
       } else {
-        await api.post("/fees", payload);
-        toast.success("Fee added successfully");
+        // --- DUPLICATE CHECK LOGIC ---
+        const pendingGradeIds = form.grade_ids.map(id => parseInt(id));
+        const sessionId = parseInt(form.school_session_id);
+        const term = form.term;
+        const description = (form.description || "").trim().toLowerCase();
+
+        // Find classes that already have this specific fee registered
+        const existingDuplicateGradeIds = fees
+          .filter(fee => 
+            fee.school_session_id === sessionId &&
+            fee.term === term &&
+            (fee.description || "").trim().toLowerCase() === description
+          )
+          .map(fee => fee.grade_id);
+
+        // Filter to only new (non-duplicate) grades
+        const newGradeIds = pendingGradeIds.filter(id => !existingDuplicateGradeIds.includes(id));
+
+        if (newGradeIds.length === 0) {
+          toast.error("Selected class(es) already have this fee record created for this term and session.");
+          setSaveLoading(false);
+          return;
+        }
+
+        if (newGradeIds.length < pendingGradeIds.length) {
+          const skippedCount = pendingGradeIds.length - newGradeIds.length;
+          toast.error(`Skipped ${skippedCount} duplicate entry/entries.`);
+        }
+
+        // Send requests only for non-duplicate classes
+        const requests = newGradeIds.map(gradeId => {
+          return api.post("/fees", {
+            grade_id: gradeId,
+            school_session_id: sessionId,
+            term: term,
+            amount: parseFloat(form.amount),
+            description: form.description,
+            school_id: schoolId
+          });
+        });
+
+        await Promise.all(requests);
+        toast.success(`Fee added successfully for ${newGradeIds.length} class(es)`);
       }
-      
+
       resetForm();
       setShow(false);
       await fetchAllData();
@@ -163,7 +238,7 @@ export default function Fee() {
   const resetForm = () => {
     const schoolId = getSchoolId();
     setForm({ 
-      grade_id: "", 
+      grade_ids: [], 
       school_session_id: "", 
       term: "", 
       amount: "", 
@@ -171,6 +246,7 @@ export default function Fee() {
       school_id: schoolId
     });
     setEditId(null);
+    setShowGradeDropdown(false);
   };
 
   const closeModal = () => {
@@ -178,36 +254,19 @@ export default function Fee() {
     resetForm();
   };
 
-  const getGradeName = (grade) => {
-    return grade?.name || grade?.grade_name || 'N/A';
-  };
-
-  const getSessionName = (session) => {
-    return session?.name || session?.session_name || 'N/A';
-  };
+  const getGradeName = (grade) => grade?.name || grade?.grade_name || 'N/A';
+  const getSessionName = (session) => session?.name || session?.session_name || 'N/A';
 
   const handleOpenModal = () => {
-    const schoolId = getSchoolId();
-    setForm({ 
-      grade_id: "", 
-      school_session_id: "", 
-      term: "", 
-      amount: "", 
-      description: "",
-      school_id: schoolId
-    });
-    setEditId(null);
+    resetForm();
     setShow(true);
   };
 
-  const formatCurrency = (amount) => {
-    return `₦${parseFloat(amount || 0).toLocaleString()}`;
-  };
+  const formatCurrency = (amount) => `₦${parseFloat(amount || 0).toLocaleString()}`;
 
   const safeGrades = Array.isArray(grades) ? grades : [];
   const safeSessions = Array.isArray(sessions) ? sessions : [];
 
-  // ========== DATATABLE CONFIGURATION ==========
   const tableColumns = [
     { header: "Class", accessor: "grade_name", width: "150px" },
     { header: "Session", accessor: "session_name", width: "150px" },
@@ -234,7 +293,7 @@ export default function Fee() {
       <button
         onClick={() => {
           setForm({
-            grade_id: row.original.grade_id || "",
+            grade_ids: row.original.grade_id ? [row.original.grade_id] : [],
             school_session_id: row.original.school_session_id || "",
             term: row.original.term || "",
             amount: row.original.amount || "",
@@ -268,6 +327,16 @@ export default function Fee() {
     );
   };
 
+  const getSelectedClassesLabel = () => {
+    if (form.grade_ids.length === 0) return "Select Class(es)";
+    if (form.grade_ids.length === safeGrades.length && safeGrades.length > 0) return "All Classes Selected";
+    if (form.grade_ids.length === 1) {
+      const grade = safeGrades.find(g => g.id === form.grade_ids[0]);
+      return getGradeName(grade);
+    }
+    return `${form.grade_ids.length} Classes Selected`;
+  };
+
   return (
     <div className="text-white p-6">
       <div className="flex justify-between items-center mb-6">
@@ -285,16 +354,6 @@ export default function Fee() {
         </button>
       </div>
 
-      {/* Debug info */}
-      <div className="mb-4 p-3 bg-slate-800 rounded text-sm">
-        <div className="text-gray-300">
-          <strong>School ID:</strong> {getSchoolId() || "Not found"}
-          <br />
-          <strong>Fees:</strong> {fees.length} records found
-        </div>
-      </div>
-
-      {/* Data Table */}
       <DataTable
         columns={tableColumns}
         data={getTableData()}
@@ -305,7 +364,6 @@ export default function Fee() {
         actions={renderActions}
       />
 
-      {/* Modal */}
       {show && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50 p-4">
           <div className="bg-slate-800 p-6 rounded-lg w-full max-w-md border border-slate-700">
@@ -313,24 +371,71 @@ export default function Fee() {
               {editId ? "Edit Fee" : "Add New Fee"}
             </h3>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
+              
+              {/* Multi-Select Grade Component */}
+              <div ref={gradeDropdownRef} className="relative">
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Class <span className="text-red-400">*</span>
+                  Class(es) <span className="text-red-400">*</span>
                 </label>
-                <select
-                  value={form.grade_id}
-                  onChange={(e) => setForm({ ...form, grade_id: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                  required
+                <button
+                  type="button"
+                  onClick={() => setShowGradeDropdown(!showGradeDropdown)}
                   disabled={saveLoading || safeGrades.length === 0}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-left text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none flex justify-between items-center"
                 >
-                  <option value="">Select Class</option>
-                  {safeGrades.map(grade => (
-                    <option key={grade.id} value={grade.id}>
-                      {getGradeName(grade)}
-                    </option>
-                  ))}
-                </select>
+                  <span className={form.grade_ids.length === 0 ? "text-gray-400" : "text-white"}>
+                    {getSelectedClassesLabel()}
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </button>
+
+                {showGradeDropdown && (
+                  <div className="absolute z-20 mt-1 w-full bg-slate-700 border border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    {!editId && (
+                      <div 
+                        onClick={toggleAllGrades}
+                        className="p-2 border-b border-slate-600 flex items-center gap-2 hover:bg-slate-600 cursor-pointer font-medium text-blue-400 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.grade_ids.length === safeGrades.length && safeGrades.length > 0}
+                          onChange={() => {}} 
+                          className="rounded border-slate-500 text-blue-600 focus:ring-0"
+                        />
+                        Select All Classes ({safeGrades.length})
+                      </div>
+                    )}
+                    {safeGrades.map(grade => {
+                      const isSelected = form.grade_ids.includes(grade.id);
+                      return (
+                        <div
+                          key={grade.id}
+                          onClick={() => {
+                            if (editId) {
+                              setForm(prev => ({ ...prev, grade_ids: [grade.id] }));
+                              setShowGradeDropdown(false);
+                            } else {
+                              toggleGrade(grade.id);
+                            }
+                          }}
+                          className="p-2.5 flex items-center justify-between hover:bg-slate-600 cursor-pointer text-sm border-b border-slate-600/50 last:border-none"
+                        >
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {}}
+                              className="rounded border-slate-500 text-blue-600 focus:ring-0"
+                            />
+                            <span className="text-white">{getGradeName(grade)}</span>
+                          </div>
+                          {isSelected && <Check className="h-4 w-4 text-blue-400" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {safeGrades.length === 0 && !loading && (
                   <p className="text-amber-400 text-sm mt-1">No classes available. Please create classes first.</p>
                 )}
@@ -385,7 +490,7 @@ export default function Fee() {
                   type="text"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Fee description (optional)"
+                  placeholder="Fee description (e.g. Tuition, Bus Fee)"
                   className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                   disabled={saveLoading}
                 />
@@ -408,14 +513,10 @@ export default function Fee() {
                 />
               </div>
 
-              <div className="p-3 bg-slate-700/50 rounded text-sm">
-                <p className="text-gray-300"><strong>Note:</strong> This fee will be added to your school (School ID: {getSchoolId()})</p>
-              </div>
-
               <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={closeModal} className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500 disabled:bg-gray-400 transition-colors font-medium" disabled={saveLoading}>Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:bg-blue-400 transition-colors font-medium" disabled={saveLoading || safeGrades.length === 0 || safeSessions.length === 0}>
-                  {saveLoading ? "Saving..." : (editId ? "Update" : "Save")}
+                <button type="button" onClick={closeModal} className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500 transition-colors font-medium" disabled={saveLoading}>Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 transition-colors font-medium disabled:bg-blue-400" disabled={saveLoading || safeGrades.length === 0 || safeSessions.length === 0}>
+                  {saveLoading ? "Saving..." : (editId ? "Update" : `Save ${form.grade_ids.length > 1 ? `(${form.grade_ids.length} Fees)` : ''}`)}
                 </button>
               </div>
             </form>

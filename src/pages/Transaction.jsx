@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import toast from "react-hot-toast";
-import { DollarSign, CreditCard, Wallet, Banknote, RefreshCw, Users, Calendar, ChevronDown, Layers, Filter } from "lucide-react";
+import { DollarSign, CreditCard, Wallet, Banknote, RefreshCw, Users, ChevronDown, Filter } from "lucide-react";
 import DataTable from "../components/DataTable";
 
 export default function Transaction() {
@@ -39,74 +39,37 @@ export default function Transaction() {
     }
 
     try {
-      console.log("🔍 Fetching transactions for school:", schoolId);
       const response = await api.get("/transactions", { 
         params: { school_id: schoolId } 
       });
-
-      console.log("📊 Full Transactions API Response:", response);
-      console.log("📊 Response data:", response.data);
 
       let transactionsData = [];
       
       if (response.data) {
         if (response.data.data?.data && Array.isArray(response.data.data.data)) {
           transactionsData = response.data.data.data;
-          console.log("✅ Found data in response.data.data.data");
-        }
-        else if (Array.isArray(response.data.data)) {
+        } else if (Array.isArray(response.data.data)) {
           transactionsData = response.data.data;
-          console.log("✅ Found data in response.data.data");
-        }
-        else if (Array.isArray(response.data)) {
+        } else if (Array.isArray(response.data)) {
           transactionsData = response.data;
-          console.log("✅ Found data in response.data");
-        }
-        else if (response.data.status === 'success' && response.data.data) {
-          if (Array.isArray(response.data.data)) {
-            transactionsData = response.data.data;
-            console.log("✅ Found data in success response");
-          } else if (response.data.data.data && Array.isArray(response.data.data.data)) {
-            transactionsData = response.data.data.data;
-            console.log("✅ Found data in success response (nested)");
-          }
         }
       }
-
-      console.log("✅ Extracted transactionsData:", transactionsData);
-      console.log("✅ Number of transactions:", transactionsData.length);
 
       if (transactionsData.length === 0) {
         await tryAlternativeEndpoints(schoolId);
         return;
       }
 
-      const feePaymentTransactions = transactionsData.filter(t => {
-        const isFeePayment = 
-          t.fee_payments || 
-          t.feePayment || 
-          t.type === 'fee_payment' ||
-          (t.reference && (t.reference.startsWith('PAY-') || t.reference.startsWith('LEGACY-'))) ||
-          (t.description && t.description.toLowerCase().includes('fee')) ||
-          (t.fee_payment && typeof t.fee_payment === 'object');
-        
-        return isFeePayment;
-      });
+      setTransactions(transactionsData || []);
 
-      console.log("✅ Filtered fee payment transactions:", feePaymentTransactions);
-      
-      setTransactions(feePaymentTransactions || []);
-
-      const total = feePaymentTransactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-      const successful = feePaymentTransactions.filter(t => 
-        t.status?.toLowerCase() === 'successful' || 
-        t.status?.toLowerCase() === 'success' || 
-        t.status === 'paid'
+      const total = transactionsData.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+      const successful = transactionsData.filter(t => 
+        ['successful', 'success', 'paid'].includes(t.status?.toLowerCase())
       ).length;
-      const pending = feePaymentTransactions.filter(t => 
+      const pending = transactionsData.filter(t => 
         t.status?.toLowerCase() === 'pending'
       ).length;
-      const failed = feePaymentTransactions.filter(t => 
+      const failed = transactionsData.filter(t => 
         t.status?.toLowerCase() === 'failed'
       ).length;
 
@@ -126,15 +89,10 @@ export default function Transaction() {
   };
 
   const tryAlternativeEndpoints = async (schoolId) => {
-    console.log("🔄 Trying alternative endpoints...");
-    
     try {
-      console.log("🔍 Trying /fee-payments endpoint");
       const feePaymentsResponse = await api.get("/fee-payments", {
         params: { school_id: schoolId, group_by_reference: "1" }
       });
-
-      console.log("📊 Fee Payments Response:", feePaymentsResponse.data);
 
       let feePaymentsData = [];
       if (feePaymentsResponse.data?.status === 'success') {
@@ -144,8 +102,6 @@ export default function Transaction() {
           feePaymentsData = feePaymentsResponse.data.data.data;
         }
       }
-
-      console.log("✅ Extracted fee payments data:", feePaymentsData);
 
       const transformedTransactions = feePaymentsData.map(payment => {
         const reference = payment.payment_reference || `FEE-${payment.id}`;
@@ -162,10 +118,6 @@ export default function Transaction() {
           payment_date: payment.payment_date,
           created_at: payment.payment_date || payment.created_at,
           student: payment.student,
-          fee_payments: payment.fee_details ? payment.fee_details.map(fee => ({
-            fee: fee,
-            amount_paid: fee.amount
-          })) : [],
           fee_breakdown: payment.fee_details ? payment.fee_details.map(fee => ({
             fee_description: fee.description || 'Fee',
             amount: fee.amount,
@@ -174,26 +126,18 @@ export default function Transaction() {
         };
       });
 
-      console.log("✅ Transformed transactions:", transformedTransactions);
-      
       setTransactions(transformedTransactions);
 
       const total = transformedTransactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-      const successful = transformedTransactions.filter(t => 
-        t.status === 'successful' || t.status === 'paid'
-      ).length;
+      const successful = transformedTransactions.filter(t => t.status === 'successful').length;
       const pending = transformedTransactions.filter(t => t.status === 'pending').length;
       const failed = transformedTransactions.filter(t => t.status === 'failed').length;
 
       setStats({ total, successful, pending, failed });
 
-      if (transformedTransactions.length > 0) {
-        toast.success(`Loaded ${transformedTransactions.length} fee payment transactions`);
-      }
-
     } catch (err) {
       console.error("❌ Alternative endpoint error:", err);
-      toast.error("No transactions found. Record fee payments first.");
+      toast.error("No transactions found.");
     }
   };
 
@@ -210,7 +154,6 @@ export default function Transaction() {
 
   const getStatusColor = (status) => {
     if (!status) return 'bg-gray-500/20 text-gray-400';
-    
     const statusLower = status.toLowerCase();
     switch (statusLower) {
       case 'successful':
@@ -226,32 +169,19 @@ export default function Transaction() {
     }
   };
 
-  const getMethodIcon = (method) => {
-    if (!method) return DollarSign;
-    
-    const methodLower = method.toLowerCase();
-    if (methodLower.includes('cash')) return Wallet;
-    if (methodLower.includes('bank')) return Banknote;
-    if (methodLower.includes('paystack') || methodLower.includes('card')) return CreditCard;
-    if (methodLower.includes('manual')) return Users;
-    return DollarSign;
-  };
-
   const getMethodDisplay = (method) => {
     if (!method) return 'N/A';
-    
     const methodLower = method.toLowerCase();
     const methodMap = {
       'paystack': 'Paystack',
+      'stripe': 'Stripe',
+      'flutterwave': 'Flutterwave',
       'bank_transfer': 'Bank Transfer',
       'cash': 'Cash',
       'card': 'Card Payment',
-      'manual': 'Manual Entry',
-      'other': 'Other',
-      'legacy': 'Legacy'
+      'manual': 'Manual Entry'
     };
-    
-    return methodMap[methodLower] || method.charAt(0).toUpperCase() + method.slice(1);
+    return methodMap[methodLower] || method.toUpperCase();
   };
 
   const formatAmount = (amount) => {
@@ -272,12 +202,10 @@ export default function Transaction() {
 
   const getStudentName = (transaction) => {
     if (transaction.fee_payments?.[0]?.student) {
-      return transaction.fee_payments[0].student.name || 
-             transaction.fee_payments[0].student.full_name;
+      return transaction.fee_payments[0].student.name || transaction.fee_payments[0].student.full_name;
     }
-    if (transaction.feePayment?.student) {
-      return transaction.feePayment.student.name || 
-             transaction.feePayment.student.full_name;
+    if (transaction.fee_payment?.student) {
+      return transaction.fee_payment.student.name || transaction.fee_payment.student.full_name;
     }
     if (transaction.student) {
       return transaction.student.name || transaction.student.full_name;
@@ -285,7 +213,6 @@ export default function Transaction() {
     return 'Student';
   };
 
-  // ========== DATATABLE CONFIGURATION ==========
   const tableColumns = [
     { header: "Reference", accessor: "reference", width: "200px" },
     { header: "Student", accessor: "student_name", width: "200px" },
@@ -337,7 +264,6 @@ export default function Transaction() {
 
   return (
     <div className="p-6">
-      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white">Transactions</h1>
@@ -345,19 +271,8 @@ export default function Transaction() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              console.log("Current transactions:", transactions);
-              console.log("Current stats:", stats);
-              toast.info("Check console for debug info");
-            }}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-colors flex items-center gap-2"
-          >
-            <Filter className="h-4 w-4" />
-            Debug
-          </button>
-          <button
             onClick={fetchTransactions}
-            className="bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-lg transition-colors font-medium flex items-center gap-2"
+            className="bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-lg transition-colors font-medium flex items-center gap-2 text-white"
             disabled={loading}
           >
             <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
@@ -366,7 +281,6 @@ export default function Transaction() {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
           <div className="flex items-center gap-4">
@@ -383,9 +297,7 @@ export default function Transaction() {
         <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
           <div className="flex items-center gap-4">
             <div className="bg-green-500/20 p-3 rounded-lg">
-              <div className="h-6 w-6 flex items-center justify-center">
-                <span className="text-green-400 font-bold">✓</span>
-              </div>
+              <span className="text-green-400 font-bold text-xl">✓</span>
             </div>
             <div>
               <p className="text-gray-400 text-sm">Successful</p>
@@ -397,9 +309,7 @@ export default function Transaction() {
         <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
           <div className="flex items-center gap-4">
             <div className="bg-yellow-500/20 p-3 rounded-lg">
-              <div className="h-6 w-6 flex items-center justify-center">
-                <span className="text-yellow-400 font-bold">⏱</span>
-              </div>
+              <span className="text-yellow-400 font-bold text-xl">⏱</span>
             </div>
             <div>
               <p className="text-gray-400 text-sm">Pending</p>
@@ -411,9 +321,7 @@ export default function Transaction() {
         <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
           <div className="flex items-center gap-4">
             <div className="bg-red-500/20 p-3 rounded-lg">
-              <div className="h-6 w-6 flex items-center justify-center">
-                <span className="text-red-400 font-bold">✗</span>
-              </div>
+              <span className="text-red-400 font-bold text-xl">✗</span>
             </div>
             <div>
               <p className="text-gray-400 text-sm">Failed</p>
@@ -423,22 +331,6 @@ export default function Transaction() {
         </div>
       </div>
 
-      {/* Debug Info */}
-      <div className="mb-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-300">
-              Showing <span className="font-bold text-white">{transactions.length}</span> transactions
-              {transactions.length > 0 && ` • Total: ${formatAmount(stats.total)}`}
-            </p>
-          </div>
-          <div className="text-sm text-gray-400">
-            Last updated: {new Date().toLocaleTimeString()}
-          </div>
-        </div>
-      </div>
-
-      {/* Data Table */}
       <DataTable
         columns={tableColumns}
         data={getTableData()}
@@ -449,7 +341,6 @@ export default function Transaction() {
         actions={renderActions}
       />
 
-      {/* Expandable Details Section */}
       {Object.keys(showDetails).some(key => showDetails[key]) && (
         <div className="mt-4 space-y-4">
           {transactions.map((transaction, idx) => {

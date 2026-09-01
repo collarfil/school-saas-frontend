@@ -25,14 +25,16 @@ export default function Header() {
       <header className="flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4 shadow-lg border-b border-slate-700">
         {/* Logo */}
         <Link to="/" className="flex items-center space-x-3 group">
-          <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center group-hover:bg-indigo-700 transition-colors">
-            <LayoutDashboard className="h-6 w-6 text-white" />
-          </div>
+           <img
+            src="/images/ohis.png"
+            alt="Logo"
+            className="h-24 mb-3 drop-shadow-lg"
+          />
           <div>
             <h1 className="text-xl font-bold text-white tracking-wide">
-              School SaaS
+              
             </h1>
-            <p className="text-xs text-gray-400">Management System</p>
+            <p className="text-xs text-gray-400"></p>
           </div>
         </Link>
 
