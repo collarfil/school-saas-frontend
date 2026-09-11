@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Home, 
-  Briefcase, 
-  Calendar, 
-  FileText, 
-  Users, 
+import {
+  Home,
+  Briefcase,
+  Calendar,
+  FileText,
+  Users,
   Wallet,
   CreditCard,
   TrendingUp,
@@ -15,7 +15,9 @@ import {
   Bell,
   Clock,
   Shield,
-  LogOut
+  LogOut,
+  Phone,
+  Video
 } from 'lucide-react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
@@ -31,6 +33,11 @@ export default function EmployeeDashboard() {
     completedToday: 0,
     upcomingTasks: 0
   });
+
+  // State for modals
+  const [showChat, setShowChat] = useState(false);
+  const [showWhatsApp, setShowWhatsApp] = useState(false);
+  const [selectedConversation, setSelectedConversation] = useState(null);
 
   // Logout function
   const handleLogout = () => {
@@ -57,7 +64,7 @@ export default function EmployeeDashboard() {
           api.get('/employee-grades/my-classes'),
           api.get('/results/pending-grading')
         ]);
-        
+
         setStats({
           totalCount: classesRes.data?.total_students || 0,
           pendingItems: resultsRes.data?.pending_count || 0,
@@ -71,7 +78,7 @@ export default function EmployeeDashboard() {
           api.get('/fee-payments/today'),
           api.get('/transactions/today')
         ]);
-        
+
         setStats({
           totalCount: feesRes.data?.total_fees || 0,
           pendingItems: feesRes.data?.pending_payments || 0,
@@ -126,10 +133,10 @@ export default function EmployeeDashboard() {
           color: 'purple'
         },
         {
-          title: 'My Schedule',
+          title: 'My Timetable',
           description: 'View class timetable',
           icon: <Clock className="h-5 w-5 text-yellow-400" />,
-          path: '/employee/schedule',
+          path: '/employee/timetables',
           color: 'yellow'
         }
       ];
@@ -157,10 +164,10 @@ export default function EmployeeDashboard() {
           color: 'purple'
         },
         {
-          title: 'Reports',
+          title: 'Fee Receipts',
           description: 'Financial reports',
           icon: <FileText className="h-5 w-5 text-yellow-400" />,
-          path: '/account/reports',
+          path: '/account/reports/fee-receipts',
           color: 'yellow'
         }
       ];
@@ -251,48 +258,6 @@ export default function EmployeeDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-gray-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-          // Add to header section of each dashboard
-        <div className="flex items-center space-x-3">
-        <button
-          onClick={() => setShowChat(true)}
-          className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
-          title="Chat"
-        >
-          <Users className="h-5 w-5" />
-        </button>
-        <button
-          onClick={() => setShowWhatsApp(true)}
-          className="p-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
-          title="WhatsApp"
-        >
-          <Phone className="h-5 w-5" />
-        </button>
-        {user?.role === 'admin' && (
-          <button
-            onClick={() => navigate('/video-classes')}
-            className="p-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-            title="Video Classes"
-          >
-            <Video className="h-5 w-5" />
-          </button>
-        )}
-      </div>
-
-      // Add state at top of component
-      const [showChat, setShowChat] = useState(false);
-      const [showWhatsApp, setShowWhatsApp] = useState(false);
-      const [selectedConversation, setSelectedConversation] = useState(null);
-
-      // Add modals at bottom
-      {showChat && (
-        <MessagingComponent
-          conversationId={selectedConversation}
-          onClose={() => setShowChat(false)}
-        />
-      )}
-      {showWhatsApp && (
-        <WhatsAppMessaging onClose={() => setShowWhatsApp(false)} />
-      )}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
@@ -304,8 +269,22 @@ export default function EmployeeDashboard() {
               </p>
             </div>
             <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setShowChat(true)}
+                className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+                title="Chat"
+              >
+                <Users className="h-5 w-5 text-gray-300" />
+              </button>
+              <button
+                onClick={() => setShowWhatsApp(true)}
+                className="p-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+                title="WhatsApp"
+              >
+                <Phone className="h-5 w-5 text-white" />
+              </button>
               <div className={`px-4 py-2 rounded-lg border ${
-                isTeachingStaff() 
+                isTeachingStaff()
                   ? 'bg-blue-500/20 border-blue-500/30 text-blue-300'
                   : 'bg-green-500/20 border-green-500/30 text-green-300'
               }`}>
@@ -378,7 +357,7 @@ export default function EmployeeDashboard() {
                     </div>
                     <span className="text-sm text-gray-400">2 hours ago</span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className="p-2 bg-green-500/20 rounded">
@@ -406,7 +385,7 @@ export default function EmployeeDashboard() {
                     </div>
                     <span className="text-sm text-gray-400">1 hour ago</span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className="p-2 bg-blue-500/20 rounded">
@@ -455,6 +434,37 @@ export default function EmployeeDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Temporary Modal Placeholders */}
+      {showChat && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 max-w-md w-full text-white">
+            <h3 className="text-lg font-bold mb-2">Chat Feature</h3>
+            <p className="text-gray-300 text-sm mb-4">Messaging is under construction.</p>
+            <button
+              onClick={() => setShowChat(false)}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showWhatsApp && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 max-w-md w-full text-white">
+            <h3 className="text-lg font-bold mb-2">WhatsApp Feature</h3>
+            <p className="text-gray-300 text-sm mb-4">WhatsApp integration is under construction.</p>
+            <button
+              onClick={() => setShowWhatsApp(false)}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

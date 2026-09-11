@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  GraduationCap, 
-  Book, 
-  Calendar, 
-  Award, 
+import {
+  GraduationCap,
+  Book,
+  Calendar,
+  Award,
   Wallet,
   FileText,
   Users,
@@ -17,8 +17,11 @@ import {
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import MessagingComponent from '../components/Chat/MessagingComponent';
-import WhatsAppMessaging from '../components/WhatsApp/WhatsAppMessaging';
+
+// ⚠️ Temporarily using placeholder modals until these component files
+// are actually built in src/components/. Swap these back in once ready:
+// import MessagingComponent from '../components/Chat/MessagingComponent';
+// import WhatsAppMessaging from '../components/WhatsApp/WhatsAppMessaging';
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
@@ -30,7 +33,7 @@ export default function StudentDashboard() {
     averageGrade: 0,
     feeBalance: 0
   });
-  
+
   // State for modals
   const [showChat, setShowChat] = useState(false);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
@@ -61,7 +64,7 @@ export default function StudentDashboard() {
         api.get('/subjects/my-subjects'),
         api.get('/fee-payments/my-balance')
       ]);
-      
+
       setStats({
         totalSubjects: subjectsRes.data?.count || 0,
         attendancePercentage: attendanceRes.data?.percentage || 0,
@@ -87,19 +90,19 @@ export default function StudentDashboard() {
       title: 'Fee Statement',
       description: 'View payment history',
       icon: <Wallet className="h-5 w-5 text-green-400" />,
-      path: '/student/fees'
+      path: '/student/pay-fees'
     },
     {
-      title: 'Class Schedule',
+      title: 'Class Timetable',
       description: 'View timetable',
       icon: <Calendar className="h-5 w-5 text-yellow-400" />,
-      path: '/student/schedule'
+      path: '/student/timetables'
     },
     {
       title: 'Attendance',
       description: 'Check attendance record',
       icon: <Clock className="h-5 w-5 text-purple-400" />,
-      path: '/student/attendance'
+      path: '/student/attendances'
     }
   ];
 
@@ -138,7 +141,7 @@ export default function StudentDashboard() {
               >
                 <Users className="h-5 w-5 text-gray-300" />
               </button>
-              
+
               {/* WhatsApp Button */}
               <button
                 onClick={() => setShowWhatsApp(true)}
@@ -147,17 +150,17 @@ export default function StudentDashboard() {
               >
                 <Phone className="h-5 w-5 text-white" />
               </button>
-              
+
               {/* Badge */}
               <div className="bg-blue-500/20 border border-blue-500/30 px-4 py-2 rounded-lg">
                 <p className="text-blue-300 font-medium">Student</p>
               </div>
-              
+
               {/* Notifications */}
               <button className="p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors">
                 <Bell className="h-5 w-5 text-gray-300" />
               </button>
-              
+
               {/* Logout Button */}
               <button
                 onClick={handleLogout}
@@ -249,7 +252,7 @@ export default function StudentDashboard() {
                 <button
                   key={index}
                   className="w-full p-3 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-left flex items-center space-x-3"
-                  onClick={() => window.location.href = action.path}
+                  onClick={() => navigate(action.path)}
                 >
                   {action.icon}
                   <div>
@@ -271,7 +274,7 @@ export default function StudentDashboard() {
             <div>
               <h3 className="text-xl font-bold text-white mb-2">Student Portal</h3>
               <p className="text-gray-300">
-                Track your academic progress, view your report card, check fee statements, 
+                Track your academic progress, view your report card, check fee statements,
                 and stay updated with your class schedule and attendance records.
               </p>
             </div>
@@ -279,15 +282,35 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Temporary Modal Placeholders */}
       {showChat && (
-        <MessagingComponent
-          conversationId={selectedConversation}
-          onClose={() => setShowChat(false)}
-        />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 max-w-md w-full text-white">
+            <h3 className="text-lg font-bold mb-2">Chat Feature</h3>
+            <p className="text-gray-300 text-sm mb-4">Messaging is under construction.</p>
+            <button
+              onClick={() => setShowChat(false)}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
+
       {showWhatsApp && (
-        <WhatsAppMessaging onClose={() => setShowWhatsApp(false)} />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 max-w-md w-full text-white">
+            <h3 className="text-lg font-bold mb-2">WhatsApp Feature</h3>
+            <p className="text-gray-300 text-sm mb-4">WhatsApp integration is under construction.</p>
+            <button
+              onClick={() => setShowWhatsApp(false)}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

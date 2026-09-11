@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import toast from "react-hot-toast";
-import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, UserCheck, X } from "lucide-react";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,9 +11,29 @@ export default function Login() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true); 
+  // State for shared-credentials account picker
+  const [accounts, setAccounts] = useState([]);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+
+  const routeForUser = (user, defaultDashboard) => {
+    if (user.role === "super_admin") return "/super-admin/dashboard";
+    if (user.role === "admin") {
+      return user.school?.is_unlocked
+        ? "/school/dashboard"
+        : "/school/subscriptions";
+    }
+    if (user.role === "employee") {
+      if (user.employee_type === "teaching") return "/employee/dashboard";
+      if (user.employee_type === "account") return "/account/dashboard";
+    }
+    if (user.role === "student") return "/student/dashboard";
+    if (user.role === "parent") return "/parent/dashboard";
+    return defaultDashboard;
+  };
+
+  const handleSubmit = async (e, selectedUserId = null) => {
+    if (e) e.preventDefault();
+    setLoading(true);
     setError("");
 
     if (!form.email || !form.password) {
@@ -22,69 +42,43 @@ export default function Login() {
       return;
     }
 
-    // In Login.jsx - update the navigation part after successful login
-
-try {
-  // In Login.jsx - update the API call
-// Remove /v1 from the endpoint string - use relative pathing from baseURL
-const res = await api.post("/auth/login", form);
-  
-  const token = res.data.access_token;
-  const user = res.data.user;
-  const defaultDashboard = res.data.default_dashboard;
-
-  if (!token || !user) throw new Error("Invalid login response");
-
-  // Save token and user to localStorage
-  localStorage.setItem("token", token);
-  localStorage.setItem("user", JSON.stringify(user));
-  api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
-  toast.success("Login successful!");
-
-  // STEP 1: Redirect to change-password if required
-  if (user.must_change_password) {
-    console.log("🔐 Password change required");
-    navigate("/change-password", { replace: true });
-    return;
-  }
-
-  // STEP 2: Map backend dashboard routes to frontend routes
-      let frontendRoute = defaultDashboard;
-
-      // Fix route mapping for super admin
-      if (user.role === 'super_admin') {
-          frontendRoute = '/super-admin/dashboard';
-      } 
-      // School admin - check subscription status
-      else if (user.role === 'admin') {
-          // Check if school is unlocked (has active subscription)
-          if (user.school?.is_unlocked) {
-              frontendRoute = '/school/dashboard';
-          } else {
-              frontendRoute = '/school/subscriptions';  // Send to payment page
-          }
-      }
-      // Employee dashboard
-      else if (user.role === 'employee') {
-          if (user.employee_type === 'teaching') {
-              frontendRoute = '/employee/dashboard';
-          } else if (user.employee_type === 'account') {
-              frontendRoute = '/account/dashboard';
-          }
-      }
-      // Student dashboard
-      else if (user.role === 'student') {
-          frontendRoute = '/student/dashboard';
-      }
-      // Parent dashboard
-      else if (user.role === 'parent') {
-          frontendRoute = '/parent/dashboard';
+    try {
+      const payload = { ...form };
+      if (selectedUserId) {
+        payload.user_id = selectedUserId;
       }
 
-      console.log(`👤 User role: ${user.role}, School unlocked: ${user.school?.is_unlocked}, Redirecting to: ${frontendRoute}`);
+      const res = await api.post("/auth/login", payload);
+
+      // Multiple accounts share these credentials — show the picker
+      // and stop here. Do NOT treat this as a successful login.
+      if (res.data?.status === "ACCOUNT_SELECTION_REQUIRED") {
+        setAccounts(res.data.accounts || []);
+        setShowAccountModal(true);
+        setLoading(false);
+        return;
+      }
+
+      const { access_token: token, user, default_dashboard: defaultDashboard } = res.data;
+
+      if (!token || !user) {
+        throw new Error("Invalid login response");
+      }
+
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+      toast.success("Login successful!");
+      setShowAccountModal(false);
+
+      if (user.must_change_password) {
+        navigate("/change-password", { replace: true });
+        return;
+      }
+
+      const frontendRoute = routeForUser(user, defaultDashboard);
       navigate(frontendRoute, { replace: true });
-
     } catch (err) {
       console.error("Login error:", err.response || err);
       const errorMessage =
@@ -93,6 +87,8 @@ const res = await api.post("/auth/login", form);
         "Login failed. Please check your credentials.";
       setError(errorMessage);
       toast.error(errorMessage);
+      setShowAccountModal(false);
+    } finally {
       setLoading(false);
     }
   };
@@ -109,9 +105,7 @@ const res = await api.post("/auth/login", form);
       admin: { email: "admin@school.com", password: "password" },
     };
     setForm(demo[role]);
-    toast(`Demo ${role.replace("_", " ")} credentials loaded`, {
-  icon: 'ℹ️',
-  });
+    toast(`Demo ${role.replace("_", " ")} credentials loaded`, { icon: "ℹ️" });
   };
 
   return (
@@ -133,7 +127,7 @@ const res = await api.post("/auth/login", form);
 
         <div className="bg-white/10 backdrop-blur-xl p-8 rounded-2xl border border-slate-600 shadow-xl">
           <h2 className="text-gray-100 text-lg font-semibold mb-6">
-            Admin Login
+            Portal Login
           </h2>
 
           {error && (
@@ -159,13 +153,13 @@ const res = await api.post("/auth/login", form);
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5 text-left">
+          <form onSubmit={(e) => handleSubmit(e)} className="space-y-5 text-left">
             <div className="relative">
               <Mail className="absolute left-3 top-3 text-gray-400 h-5 w-5" />
               <input
-                type="email"
+                type="text"
                 name="email"
-                placeholder="Email Address"
+                placeholder="Email, Phone or Username"
                 value={form.email}
                 onChange={handleInputChange}
                 className="w-full bg-slate-800/60 border border-slate-600 rounded-lg px-10 py-2 text-gray-200 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 outline-none transition-colors"
@@ -208,19 +202,19 @@ const res = await api.post("/auth/login", form);
               ) : (
                 <span>Login to Dashboard</span>
               )}
-          {/* GOOD (Fixed code): Properly wrapped React comment */}
-          </button>
+            </button>
           </form>
-          {/* Add this after the login button, before the create super admin section */}
+
           <div className="text-right mt-2">
-          <button
-            type="button"
-            onClick={() => navigate("/forgot-password")}
-            className="text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
-          >
-            Forgot Password?
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => navigate("/forgot-password")}
+              className="text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
+            >
+              Forgot Password?
+            </button>
+          </div>
+
           <div className="mt-6 pt-4 border-t border-slate-600">
             <p className="text-sm text-gray-400 text-center">
               Setting up the system for the first time?{" "}
@@ -233,11 +227,52 @@ const res = await api.post("/auth/login", form);
             </p>
           </div>
         </div>
-       
       </div>
+
+      {/* Account Selector Modal */}
+      {showAccountModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 text-white shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center space-x-2">
+                <UserCheck className="h-6 w-6 text-indigo-400" />
+                <h3 className="text-lg font-bold">Select Account</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAccountModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-300 mb-4">
+              Multiple accounts share these login credentials. Please select which profile you want to enter:
+            </p>
+
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+              {accounts.map((acc) => (
+                <button
+                  key={acc.id}
+                  type="button"
+                  disabled={loading}
+                  onClick={(e) => handleSubmit(e, acc.id)}
+                  className="w-full flex items-center justify-between p-3 bg-slate-700/60 hover:bg-indigo-600 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <div className="text-left">
+                    <p className="font-semibold text-white">{acc.name}</p>
+                    <p className="text-xs text-gray-400">{acc.email}</p>
+                  </div>
+                  <span className="text-xs font-semibold uppercase px-2 py-1 bg-slate-800 text-indigo-300 rounded-md">
+                    {acc.role}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-    
   );
 }
-
-

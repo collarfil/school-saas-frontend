@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  GraduationCap, 
-  FileText, 
+import {
+  Users,
+  GraduationCap,
+  FileText,
   Wallet,
   Bell,
   TrendingUp,
@@ -16,7 +16,8 @@ import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
-// ⚠️ Temporarily commented out until these component files are created in src/components/
+// ⚠️ Temporarily using placeholder modals until these component files
+// are actually built in src/components/. Swap these back in once ready:
 // import MessagingComponent from '../components/MessagingComponent';
 // import WhatsAppMessaging from '../components/WhatsAppMessaging';
 
@@ -82,7 +83,7 @@ export default function ParentDashboard() {
       title: 'Children\'s Report',
       description: 'View academic reports',
       icon: <FileText className="h-5 w-5 text-blue-400" />,
-      path: '/parent/reports'
+      path: '/parent/report-card'
     },
     {
       title: 'Fee Statements',
@@ -100,9 +101,19 @@ export default function ParentDashboard() {
       title: 'Notifications',
       description: 'School announcements',
       icon: <Bell className="h-5 w-5 text-purple-400" />,
-      path: '/parent/notifications'
+      // No /parent/notifications route exists yet — surface a
+      // friendly heads-up instead of navigating to a 404.
+      path: null
     }
   ];
+
+  const handleQuickAction = (action) => {
+    if (!action.path) {
+      toast('Notifications page is coming soon', { icon: 'ℹ️' });
+      return;
+    }
+    navigate(action.path);
+  };
 
   if (loading) {
     return (
@@ -147,15 +158,6 @@ export default function ParentDashboard() {
                 >
                   <Phone className="h-5 w-5" />
                 </button>
-                {user?.role === 'admin' && (
-                  <button
-                    onClick={() => navigate('/video-classes')}
-                    className="p-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors text-white"
-                    title="Video Classes"
-                  >
-                    <Video className="h-5 w-5" />
-                  </button>
-                )}
               </div>
 
               <div className="bg-purple-500/20 border border-purple-500/30 px-4 py-2 rounded-lg">
@@ -283,8 +285,8 @@ export default function ParentDashboard() {
               <p className="text-gray-300 text-sm mb-4">
                 {action.description}
               </p>
-              <button 
-                onClick={() => navigate(action.path)}
+              <button
+                onClick={() => handleQuickAction(action)}
                 className="text-blue-400 hover:text-blue-300 text-sm font-medium"
               >
                 Access →
@@ -302,7 +304,7 @@ export default function ParentDashboard() {
             <div>
               <h3 className="text-xl font-bold text-white mb-2">Parent Portal</h3>
               <p className="text-gray-300">
-                Monitor your children's academic progress, attendance records, fee payments, 
+                Monitor your children's academic progress, attendance records, fee payments,
                 and stay informed about school activities and PTA meetings.
               </p>
             </div>
@@ -316,7 +318,7 @@ export default function ParentDashboard() {
           <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 max-w-md w-full text-white">
             <h3 className="text-lg font-bold mb-2">Chat Feature</h3>
             <p className="text-gray-300 text-sm mb-4">MessagingComponent is under construction or not found.</p>
-            <button 
+            <button
               onClick={() => setShowChat(false)}
               className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm"
             >
@@ -331,7 +333,7 @@ export default function ParentDashboard() {
           <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 max-w-md w-full text-white">
             <h3 className="text-lg font-bold mb-2">WhatsApp Feature</h3>
             <p className="text-gray-300 text-sm mb-4">WhatsAppMessaging component is under construction or not found.</p>
-            <button 
+            <button
               onClick={() => setShowWhatsApp(false)}
               className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm"
             >

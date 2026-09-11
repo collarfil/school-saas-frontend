@@ -70,7 +70,7 @@ export default function Sidebar() {
   const getMenuItems = () => {
     const role = user.role;
     const employeeType = user.employee_type;
-    
+
     // Common menus for all roles
     const commonMenus = [
       {
@@ -101,6 +101,7 @@ export default function Sidebar() {
             { name: "Grade", path: "/school/grades", icon: <ClipboardList className="w-4 h-4" /> },
             { name: "Subject", path: "/school/subjects", icon: <Book className="w-4 h-4" /> },
             { name: "Admission", path: "/school/admissions", icon: <UserPlus className="w-4 h-4" /> },
+            { name: "Admission List", path: "/school/admission-list", icon: <Users className="w-4 h-4" /> },
           ]
         },
         {
@@ -180,7 +181,7 @@ export default function Sidebar() {
             { name: 'Exam Grades', path: "/school/exam-grades", icon: <ClipboardList className="w-4 h-4" /> },
             { name: 'Student Responses', path: "/school/student-responses", icon: <Users className="w-4 h-4" /> },
             { name: 'Exam Results', path: "/school/exam-results", icon: <FileText className="w-4 h-4" /> },
-            { name: 'Options', path: "/school/exam-options", icon: <Settings className="w-4 h-4" /> }, 
+            { name: 'Options', path: "/school/exam-options", icon: <Settings className="w-4 h-4" /> },
           ]
         },
         {
@@ -229,14 +230,16 @@ export default function Sidebar() {
           type: 'dropdown',
           requiresSubscription: true,
           submenus: [
+            { name: "My Students", path: "/employee/students", icon: <Users className="w-4 h-4" /> },
             { name: "Attendance", path: "/employee/attendances", icon: <CalendarDays className="w-4 h-4" /> },
             { name: "Results", path: "/employee/results", icon: <FileText className="w-4 h-4" /> },
+            { name: "Timetable", path: "/employee/timetables", icon: <Calendar className="w-4 h-4" /> },
           ]
         }
       ];
     }
 
-    // Employee - Non-Teaching Staff (Account)
+    // Employee - Non-Teaching Staff (Accountant / Account Staff)
     if (role === 'employee' && employeeType === 'non_teaching') {
       return [
         {
@@ -254,14 +257,24 @@ export default function Sidebar() {
           type: 'dropdown',
           requiresSubscription: false,
           submenus: [
-            { name: "Subscription", path: "/school/subscriptions", icon: <Crown className="w-4 h-4" /> },
-            { name: "Fee Setup (Offline)", path: "/account/fees", icon: <Wallet className="w-4 h-4" />, requiresSubscription: true },
+            { name: "Subscription", path: "/account/subscriptions", icon: <Crown className="w-4 h-4" /> },
+            { name: "Fee Setup", path: "/account/fees", icon: <Wallet className="w-4 h-4" />, requiresSubscription: true },
             { name: "Online Fee Payment", path: "/account/online-fee-payments", icon: <CreditCard className="w-4 h-4" />, requiresSubscription: true },
             { name: "Online Gateway Setup", path: "/account/online-payments", icon: <Globe className="w-4 h-4" />, requiresSubscription: true },
-            { name: "Fee Payment", path: "/account/feepayments", icon: <CreditCard className="w-4 h-4" />, requiresSubscription: true },
-            { name: "Transaction", path: "/account/transactions", icon: <ShoppingBag className="w-4 h-4" />, requiresSubscription: true },
+            { name: "Offline Fee Payment", path: "/account/feepayments", icon: <Receipt className="w-4 h-4" />, requiresSubscription: true },
+            { name: "Transactions", path: "/account/transactions", icon: <ShoppingBag className="w-4 h-4" />, requiresSubscription: true },
             { name: "Income", path: "/account/incomes", icon: <TrendingUp className="w-4 h-4" />, requiresSubscription: true },
             { name: "Expense", path: "/account/expenses", icon: <TrendingDown className="w-4 h-4" />, requiresSubscription: true },
+          ]
+        },
+        {
+          id: 'reports',
+          title: 'Reports',
+          icon: <BarChart3 className="w-4 h-4" />,
+          type: 'dropdown',
+          requiresSubscription: true,
+          submenus: [
+            { name: "Fee Receipts", path: "/account/reports/fee-receipts", icon: <Receipt className="w-4 h-4" /> },
           ]
         }
       ];
@@ -283,7 +296,7 @@ export default function Sidebar() {
           title: 'Fee Payments',
           icon: <CreditCard className="w-4 h-4" />,
           type: 'single',
-          path: '/student/fees',
+          path: '/student/pay-fees',
           requiresSubscription: true
         },
         {
@@ -294,7 +307,8 @@ export default function Sidebar() {
           requiresSubscription: true,
           submenus: [
             { name: "Report Card", path: "/student/report-card", icon: <FileText className="w-4 h-4" /> },
-            { name: "PTA Information", path: "/student/pta", icon: <Users className="w-4 h-4" /> },
+            { name: "Timetable", path: "/student/timetables", icon: <Calendar className="w-4 h-4" /> },
+            { name: "Attendance", path: "/student/attendances", icon: <CalendarDays className="w-4 h-4" /> },
           ]
         }
       ];
@@ -312,11 +326,19 @@ export default function Sidebar() {
           requiresSubscription: true
         },
         {
+          id: 'children',
+          title: "My Children",
+          icon: <Users className="w-4 h-4" />,
+          type: 'single',
+          path: '/parent/children',
+          requiresSubscription: true
+        },
+        {
           id: 'financials',
           title: 'Pay School Fees',
           icon: <CreditCard className="w-4 h-4" />,
           type: 'single',
-          path: '/parent/fees',
+          path: '/parent/pay-fees',
           requiresSubscription: true
         },
         {
@@ -365,8 +387,8 @@ export default function Sidebar() {
   const menuItems = getMenuItems();
 
   const toggleMenu = (menuId) => {
-    setOpenMenus(prev => 
-      prev.includes(menuId) 
+    setOpenMenus(prev =>
+      prev.includes(menuId)
         ? prev.filter(id => id !== menuId)
         : [...prev, menuId]
     );
@@ -396,12 +418,28 @@ export default function Sidebar() {
     return hasActiveSubscription;
   };
 
+  // Only school admins and account staff have an actual subscription
+  // page they can navigate to. Every other role's subscription state
+  // is managed entirely by the school admin, so we don't send them to
+  // a page they can't access — the disabled/locked styling on the menu
+  // item already communicates the restriction.
+  const subscriptionPathForRole = () => {
+    if (user.role === 'admin') return '/school/subscriptions';
+    if (user.role === 'employee' && user.employee_type === 'non_teaching') {
+      return '/account/subscriptions';
+    }
+    return null;
+  };
+
   const handleMenuClick = (menu, submenu = null) => {
     const requiresSub = submenu ? submenu.requiresSubscription : menu.requiresSubscription;
     if (['super_admin', 'admin'].includes(user.role)) return true;
-    
+
     if (requiresSub && !hasActiveSubscription) {
-      navigate('/school/subscriptions');
+      const subscriptionPath = subscriptionPathForRole();
+      if (subscriptionPath) {
+        navigate(subscriptionPath);
+      }
       return false;
     }
     return true;
@@ -410,7 +448,7 @@ export default function Sidebar() {
   const getRoleDisplayName = () => {
     const role = user.role;
     const employeeType = user.employee_type;
-    
+
     if (role === 'super_admin') return 'Super Admin';
     if (role === 'admin') return 'School Admin';
     if (role === 'employee') {
@@ -424,7 +462,7 @@ export default function Sidebar() {
   const getDashboardTitle = () => {
     const role = user.role;
     const employeeType = user.employee_type;
-    
+
     if (role === 'super_admin') return 'Super Admin Panel';
     if (role === 'admin') return 'Admin Panel';
     if (role === 'employee') {
@@ -438,7 +476,7 @@ export default function Sidebar() {
   const getDashboardSubtitle = () => {
     const role = user.role;
     const employeeType = user.employee_type;
-    
+
     if (role === 'super_admin') return 'Platform Management';
     if (role === 'admin') return 'School Management System';
     if (role === 'employee') {
@@ -477,24 +515,24 @@ export default function Sidebar() {
         <p className="text-sm text-slate-300 text-center mt-2">
           {getDashboardSubtitle()}
         </p>
-        
+
         <div className="mt-2 px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full">
           <p className="text-sm text-blue-300 text-center font-medium">
             {getRoleDisplayName()}
           </p>
         </div>
-        
+
         {/* Subscription Status Badge */}
         {user.role !== 'super_admin' && user.role !== 'admin' && (
           <div className={`mt-3 px-3 py-1 rounded-full text-xs font-medium text-center ${
-            hasActiveSubscription 
-              ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+            hasActiveSubscription
+              ? 'bg-green-500/20 text-green-300 border border-green-500/30'
               : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
           }`}>
             {hasActiveSubscription ? '✓ Active Subscription' : '⚠ Subscription Required'}
           </div>
         )}
-        
+
         {/* Admin Subscription Warning */}
         {user.role === 'admin' && !hasActiveSubscription && (
           <div className="mt-3 px-3 py-1 rounded-full text-xs font-medium text-center bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
@@ -556,10 +594,10 @@ export default function Sidebar() {
                         </div>
                         <span className="font-medium">{menu.title}</span>
                       </div>
-                      <ChevronDown 
+                      <ChevronDown
                         className={`w-4 h-4 transition-transform duration-200 ${
                           isMenuOpen(menu.id) ? 'rotate-180 text-blue-300' : 'text-slate-400'
-                        }`} 
+                        }`}
                       />
                     </button>
 

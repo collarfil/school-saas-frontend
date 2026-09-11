@@ -13,18 +13,22 @@ import SuperAdminLayout from "../layouts/SuperAdminLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 
 /* =======================
-  FORGOT PASSWORD & RESET
+   AUTH & PUBLIC PAGES
 ======================= */
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
-
-/* =======================
-   PUBLIC PAGES
-======================= */
 import Home from "../pages/Home";
 import Login from "../pages/Login";
 import SuperAdminRegister from "../pages/SuperAdminRegister";
 import ChangePassword from "../pages/ChangePassword";
+
+/* =======================
+   NEW PUBLIC PAGES (About, Features, Pricing, Schools)
+======================= */
+import About from "../pages/About";
+import Features from "../pages/Features";
+import Pricing from "../pages/Pricing";
+import Schools from "../pages/Schools";
 
 /* =======================
    PAYMENT
@@ -44,8 +48,8 @@ import Subject from "../pages/Subject";
 import Parent from "../pages/Parent";
 import Employee from "../pages/Employee";
 import Fee from "../pages/Fee";
-import OnlineFeePayment from "../pages/OnlineFeePayment"; // ONLINE FEE CHECKOUT FOR STUDENTS & PARENTS
-import OnlinePayment from "../pages/OnlinePayment"; // GATEWAY MANAGEMENT FOR ADMIN / ACCOUNT STAFF
+import OnlineFeePayment from "../pages/OnlineFeePayment";
+import OnlinePayment from "../pages/OnlinePayment";
 import FeePayment from "../pages/FeePayment";
 import Transaction from "../pages/Transaction";
 import Subscription from "../pages/Subscription";
@@ -57,6 +61,7 @@ import EmployeeGrade from "../pages/EmployeeGrade";
 import EmployeeSubject from "../pages/EmployeeSubject";
 import Attendance from "../pages/Attendance";
 import Admission from "../pages/Admission";
+import AdmissionList from "../pages/AdmissionList";
 import Timetable from "../pages/Timetable";
 import Assignment from "../pages/Assignment";
 import AssignmentSubmission from "../pages/AssignmentSubmission";
@@ -71,8 +76,32 @@ import Meeting from "../pages/Meeting";
 import MeetingParticipant from "../pages/MeetingParticipant";
 
 /* =======================
-    CBT PAGES
-  ======================= */
+   PUBLIC ADMISSION PAGES
+======================= */
+import PublicAdmission from "../pages/PublicAdmission";
+import AdmissionStatus from "../pages/AdmissionStatus";
+import PublicAdmissionList from "../pages/PublicAdmissionList";
+
+/* =======================
+   REPORTS PAGES
+======================= */
+import PTA from "../pages/Reports/PTA";
+import SummaryReport from "../pages/Reports/SummaryReport";
+import IncomeReport from "../pages/Reports/IncomeReport";
+import ExpenseReport from "../pages/Reports/ExpenseReport";
+import ProfitLossReport from "../pages/Reports/ProfitLossReport";
+import FeeInvoiceReport from "../pages/Reports/FeeInvoiceReport";
+import StudentReport from "../pages/Reports/StudentReport";
+import ReportCard from "../pages/Reports/ReportCard";
+
+import AcademicReport from "../pages/reports/AcademicReport";
+import EmployeesReport from "../pages/reports/EmployeesReport";
+import FeeReceipts from "../pages/reports/FeeReceipts";
+import IncomeExpenditure from "../pages/reports/IncomeExpenditure";
+
+/* =======================
+   CBT PAGES
+======================= */
 import ExamSession from "../pages/ExamSession";
 import ExamGrade from "../pages/ExamGrade";
 import ExamResult from "../pages/ExamResult";
@@ -110,15 +139,6 @@ import SuperAdminUserRegister from "../pages/SuperAdminUserRegister";
 ======================= */
 import NotFound from "../pages/NotFound";
 
-/* ======================
-   REPORTS
-======================= */
-import StudentReport from "../pages/reports/StudentReport";
-import FeeReceipts from "../pages/reports/FeeReceipts";
-import IncomeExpenditure from "../pages/reports/IncomeExpenditure";
-import AcademicReport from "../pages/reports/AcademicReport";
-import EmployeesReport from "../pages/reports/EmployeesReport";
-
 /* =======================
    SCHOOL ROUTES LIST
 ======================= */
@@ -131,9 +151,9 @@ const schoolPages = [
   ["parents", Parent],
   ["employees", Employee],
   ["fees", Fee],
-  ["onlinefees", OnlineFeePayment],           // Fixed: Route alias for sidebar link /school/onlinefees
-  ["online-fee-payments", OnlineFeePayment],  // Route alias for /school/online-fee-payments
-  ["online-payments", OnlinePayment],         // Gateway Setup
+  ["onlinefees", OnlineFeePayment],
+  ["online-fee-payments", OnlineFeePayment],
+  ["online-payments", OnlinePayment],
   ["feepayments", FeePayment],
   ["transactions", Transaction],
   ["incomes", Income],
@@ -144,6 +164,7 @@ const schoolPages = [
   ["employee-subjects", EmployeeSubject],
   ["attendances", Attendance],
   ["admissions", Admission],
+  ["admission-list", AdmissionList],
   ["timetables", Timetable],
   ["assignments", Assignment],
   ["assignment-submissions", AssignmentSubmission],
@@ -156,7 +177,6 @@ const schoolPages = [
   ["class-attendances", ClassAttendance],
   ["meetings", Meeting],
   ["meeting-participants", MeetingParticipant],
-  // CBT Page References
   ["exam-sessions", ExamSession],
   ["exam-grades", ExamGrade],
   ["exam-results", ExamResult],
@@ -165,6 +185,7 @@ const schoolPages = [
   ["exam-options", Option],
   ["exams", Exam],
   ["questions", Question],
+  ["pta", PTA],
 ];
 
 /* =======================
@@ -172,26 +193,38 @@ const schoolPages = [
 ======================= */
 const router = createBrowserRouter(
   [
-    /* ---------- PUBLIC ---------- */
+    /* ---------- PUBLIC ROUTES ---------- */
     {
       element: <MainLayout />,
       children: [
+        // Main routes
         { path: "/", element: <Home /> },
+
+        // ✅ NEW PUBLIC PAGES
+        { path: "/about", element: <About /> },
+        { path: "/features", element: <Features /> },
+        { path: "/pricing", element: <Pricing /> },
+        { path: "/schools", element: <Schools /> },
+
+        // Auth & account
         { path: "/login", element: <Login /> },
         { path: "/forgot-password", element: <ForgotPassword /> },
         { path: "/reset-password", element: <ResetPassword /> },
         { path: "/register/super-admin", element: <SuperAdminRegister /> },
         { path: "/change-password", element: <ChangePassword /> },
-        
-        // Paystack callbacks
         { path: "/payment/callback", element: <PaymentCallback /> },
         { path: "/payment/success", element: <PaymentSuccess /> },
         { path: "/subscription/callback", element: <PaymentCallback /> },
         { path: "/subscription/success", element: <PaymentSuccess /> },
+
+        // ===== PUBLIC ADMISSION ROUTES =====
+        { path: "/admission/apply", element: <PublicAdmission /> },
+        { path: "/admission/status", element: <AdmissionStatus /> },
+        { path: "/admission/lists", element: <PublicAdmissionList /> },
       ],
     },
 
-    /* ---------- REDIRECTS (Catch old admin paths) ---------- */
+    /* ---------- REDIRECTS ---------- */
     {
       path: "/admin",
       element: <Navigate to="/school/dashboard" replace />,
@@ -225,7 +258,7 @@ const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
-        // Reports
+        // ===== REPORTS =====
         {
           path: "/school/reports/student-results",
           element: (
@@ -266,7 +299,55 @@ const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
-        // Dynamic school pages
+        {
+          path: "/school/reports/generate",
+          element: (
+            <ProtectedRoute requiredRole="admin" requireSubscription>
+              <ReportCard />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/school/reports/summary",
+          element: (
+            <ProtectedRoute requiredRole="admin" requireSubscription>
+              <SummaryReport />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/school/reports/income",
+          element: (
+            <ProtectedRoute requiredRole="admin" requireSubscription>
+              <IncomeReport />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/school/reports/expense",
+          element: (
+            <ProtectedRoute requiredRole="admin" requireSubscription>
+              <ExpenseReport />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/school/reports/profit-loss",
+          element: (
+            <ProtectedRoute requiredRole="admin" requireSubscription>
+              <ProfitLossReport />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/school/reports/fee-invoice",
+          element: (
+            <ProtectedRoute requiredRole="admin" requireSubscription>
+              <FeeInvoiceReport />
+            </ProtectedRoute>
+          ),
+        },
+        // ===== DYNAMIC SCHOOL PAGES =====
         ...schoolPages.map(([path, Component]) => ({
           path: `/school/${path}`,
           element: (
@@ -323,6 +404,22 @@ const router = createBrowserRouter(
           element: (
             <ProtectedRoute requiredRole="employee" requireSubscription>
               <Timetable />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/employee/reports/generate",
+          element: (
+            <ProtectedRoute requiredRole="employee" requireSubscription>
+              <ReportCard />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/employee/reports/student-results",
+          element: (
+            <ProtectedRoute requiredRole="employee" requireSubscription>
+              <StudentReport />
             </ProtectedRoute>
           ),
         },
@@ -440,7 +537,7 @@ const router = createBrowserRouter(
           path: "/student/report-card",
           element: (
             <ProtectedRoute requiredRole="student" requireSubscription>
-              <StudentReport />
+              <ReportCard />
             </ProtectedRoute>
           ),
         },
@@ -476,6 +573,14 @@ const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
+        {
+          path: "/student/results",
+          element: (
+            <ProtectedRoute requiredRole="student" requireSubscription>
+              <StudentReport />
+            </ProtectedRoute>
+          ),
+        },
       ],
     },
 
@@ -507,7 +612,7 @@ const router = createBrowserRouter(
           path: "/parent/report-card",
           element: (
             <ProtectedRoute requiredRole="parent" requireSubscription>
-              <StudentReport />
+              <ReportCard />
             </ProtectedRoute>
           ),
         },
@@ -527,10 +632,26 @@ const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
+        {
+          path: "/parent/results",
+          element: (
+            <ProtectedRoute requiredRole="parent" requireSubscription>
+              <StudentReport />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/parent/pta",
+          element: (
+            <ProtectedRoute requiredRole="parent" requireSubscription>
+              <PTA />
+            </ProtectedRoute>
+          ),
+        },
       ],
     },
 
-    /* ---------- SUPER ADMIN (SAAS OWNER) ---------- */
+    /* ---------- SUPER ADMIN ---------- */
     {
       element: (
         <ProtectedRoute requiredRole="super_admin">
@@ -547,8 +668,11 @@ const router = createBrowserRouter(
       ],
     },
 
-    /* ---------- 404 ---------- */
-    { path: "*", element: <NotFound /> },
+    /* ---------- 404 - Catch all unmatched routes ---------- */
+    {
+      path: "*",
+      element: <NotFound />,
+    },
   ],
   {
     future: {

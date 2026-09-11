@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { UserPlus, LogOut, Home, User, LayoutDashboard, Menu, Crown } from "lucide-react";
 import { useState } from "react";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Header() {
   const token = localStorage.getItem("token");
@@ -25,15 +26,13 @@ export default function Header() {
       <header className="flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4 shadow-lg border-b border-slate-700">
         {/* Logo */}
         <Link to="/" className="flex items-center space-x-3 group">
-           <img
+          <img
             src="/images/ohis.png"
             alt="Logo"
             className="h-24 mb-3 drop-shadow-lg"
           />
           <div>
-            <h1 className="text-xl font-bold text-white tracking-wide">
-              
-            </h1>
+            <h1 className="text-xl font-bold text-white tracking-wide"></h1>
             <p className="text-xs text-gray-400"></p>
           </div>
         </Link>
@@ -41,33 +40,33 @@ export default function Header() {
         <nav className="flex items-center space-x-6">
           {!token ? (
             <>
-              {/* Public Navigation */}
-              <Link 
-                to="/" 
+              <Link
+                to="/"
                 className="flex items-center space-x-2 text-gray-300 hover:text-indigo-300 transition-colors"
               >
                 <Home className="h-4 w-4" />
                 <span>Home</span>
               </Link>
-              
-              <Link 
-                to="/login" 
+
+              <Link
+                to="/login"
                 className="flex items-center space-x-2 text-gray-300 hover:text-indigo-300 transition-colors font-medium"
               >
                 <User className="h-4 w-4" />
                 <span>Login</span>
               </Link>
 
-              <Link 
-                to="/register/super-admin" 
+              <Link
+                to="/register/super-admin"
                 className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
               >
                 <UserPlus className="h-4 w-4" />
                 <span>Register</span>
               </Link>
+
+              <ThemeToggle />
             </>
           ) : (
-            /* Authenticated User Navigation */
             <div className="flex items-center space-x-4">
               {/* User Info */}
               <div className="flex items-center space-x-3">
@@ -82,9 +81,9 @@ export default function Header() {
                 </div>
               </div>
 
-              {/* Dashboard Link - Different for super admin */}
-              <Link 
-                to={isSuperAdmin ? "/super-admin/dashboard" : "/admin/dashboard"} 
+              {/* Dashboard Link */}
+              <Link
+                to={isSuperAdmin ? "/super-admin/dashboard" : "/admin/dashboard"}
                 className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
               >
                 <LayoutDashboard className="h-4 w-4" />
@@ -99,6 +98,8 @@ export default function Header() {
                 <LogOut className="h-4 w-4" />
                 <span>Logout</span>
               </button>
+
+              <ThemeToggle />
             </div>
           )}
         </nav>
@@ -125,9 +126,7 @@ export default function Header() {
         <p className="text-sm text-gray-400">
           Welcome back, {user?.name}
           {isSuperAdmin && (
-            <span className="ml-2 text-yellow-400">
-              • Super Administrator
-            </span>
+            <span className="ml-2 text-yellow-400">• Super Administrator</span>
           )}
         </p>
       </div>
@@ -155,8 +154,8 @@ export default function Header() {
 
         {/* Register Button (only for Super Admin) */}
         {isSuperAdmin && (
-          <Link 
-            to="/admin/register" 
+          <Link
+            to="/admin/register"
             className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors font-medium text-sm"
           >
             <UserPlus className="h-4 w-4" />
@@ -172,6 +171,9 @@ export default function Header() {
           <LogOut className="h-4 w-4" />
           <span className="hidden sm:inline">Logout</span>
         </button>
+
+        {/* Theme Toggle */}
+        <ThemeToggle />
       </nav>
 
       {/* Mobile Menu */}
@@ -195,10 +197,10 @@ export default function Header() {
                 <p className="text-gray-400 text-sm capitalize">{user?.role}</p>
               </div>
             </div>
-            
+
             {isSuperAdmin && (
-              <Link 
-                to="/admin/register" 
+              <Link
+                to="/admin/register"
                 className="flex items-center space-x-2 text-gray-300 hover:text-white py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -206,7 +208,7 @@ export default function Header() {
                 <span>Register User</span>
               </Link>
             )}
-            
+
             <button
               onClick={() => {
                 handleLogout();
@@ -243,6 +245,5 @@ function getPageTitle(pathname) {
     '/admin/resultlockers': 'Result Locker',
     '/admin/register': 'Register User'
   };
-  
   return routes[pathname] || 'Admin Panel';
 }

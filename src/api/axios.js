@@ -1,38 +1,57 @@
-import axios from 'axios';
+// src/api/axios.js
+import axios from "axios";
 
+// Define API base — reads from .env, falls back to localhost
+const API_BASE =
+  (import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api/v1";
+
+// ============================================
+// Authenticated API instance (dashboard usage)
+// ============================================
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api/v1', // Make sure /api/ is present!
+  baseURL: API_BASE,
   headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
+    "Content-Type": "application/json",
+    Accept: "application/json",
   },
 });
 
-// Add JWT token to requests
+// Attach JWT token to every request
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Handle JWT token expiration
+// Handle 401 (expired token)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }
 );
 
+// ============================================
+// Public API instance (no auth)
+// Used for public admission portal, school directory, etc.
+// ============================================
+const publicApi = axios.create({
+  baseURL: API_BASE,
+  headers: {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  },
+});
+
+export { publicApi };
 export default api;
