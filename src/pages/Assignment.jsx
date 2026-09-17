@@ -1,9 +1,184 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
 import api from "../api/axios";
 import DataTable from "../components/DataTable";
-import { Edit, Trash2, Plus, Eye, Calendar, Clock, FileText, CheckCircle, XCircle, Send } from "lucide-react";
+import { Edit, Trash2, Plus, Eye, Calendar, Clock, FileText, CheckCircle, XCircle, Send, Search, ChevronDown, X } from "lucide-react";
 
+/* ------------------------------------------------------------------ */
+/* Searchable Select — self-contained, no external deps               */
+/* ------------------------------------------------------------------ */
+function SearchableSelect({
+  options = [],
+  value,
+  onChange,
+  placeholder = "Select...",
+  disabled = false,
+  required = false,
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [highlight, setHighlight] = useState(0);
+  const wrapperRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const selected = useMemo(
+    () => options.find((o) => String(o.value) === String(value)),
+    [options, value]
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, query]);
+
+  // Click outside closes dropdown
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
+    setHighlight(0);
+  }, [query, open]);
+
+  const handleKeyDown = (e) => {
+    if (!open && (e.key === "ArrowDown" || e.key === "Enter")) {
+      e.preventDefault();
+      setOpen(true);
+      return;
+    }
+    if (!open) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlight((h) => Math.min(h + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => Math.max(h - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const pick = filtered[highlight];
+      if (pick) {
+        onChange(pick.value);
+        setOpen(false);
+        setQuery("");
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  };
+
+  const handleSelect = (opt) => {
+    onChange(opt.value);
+    setOpen(false);
+    setQuery("");
+  };
+
+  const handleClear = (e) => {
+    e.stopPropagation();
+    onChange("");
+    setQuery("");
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={() => !disabled && setOpen((o) => !o)}
+        onKeyDown={handleKeyDown}
+        disabled={disabled}
+        className={`w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-left text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none flex items-center justify-between ${
+          disabled ? "opacity-60 cursor-not-allowed" : ""
+        }`}
+      >
+        <span className={selected ? "text-white" : "text-gray-400"}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <span className="flex items-center gap-1">
+          {selected && !disabled && (
+            <span
+              onClick={handleClear}
+              className="text-gray-400 hover:text-red-400 p-0.5"
+              title="Clear"
+            >
+              <X className="h-3.5 w-3.5" />
+            </span>
+          )}
+          <ChevronDown className="h-4 w-4 text-gray-400" />
+        </span>
+      </button>
+
+      {/* Hidden input for native form required validation */}
+      {required && (
+        <input
+          tabIndex={-1}
+          value={value || ""}
+          onChange={() => {}}
+          required
+          className="absolute opacity-0 pointer-events-none h-0 w-0"
+        />
+      )}
+
+      {/* Dropdown */}
+      {open && !disabled && (
+        <div className="absolute z-[60] mt-1 w-full bg-slate-800 border border-slate-600 rounded-lg shadow-2xl max-h-64 overflow-hidden">
+          {/* Search input */}
+          <div className="p-2 border-b border-slate-700 sticky top-0 bg-slate-800">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+              <input
+                ref={inputRef}
+                autoFocus
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Search..."
+                className="w-full bg-slate-700 border border-slate-600 rounded pl-8 pr-3 py-1.5 text-sm text-white placeholder-gray-400 focus:border-blue-500 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Options list */}
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-3 text-sm text-gray-400 text-center">
+                No matches found
+              </div>
+            ) : (
+              filtered.map((opt, i) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onMouseEnter={() => setHighlight(i)}
+                  onClick={() => handleSelect(opt)}
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                    i === highlight
+                      ? "bg-blue-600/40 text-white"
+                      : "text-gray-200 hover:bg-slate-700"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Assignment component — unchanged except Subject field              */
+/* ------------------------------------------------------------------ */
 export default function Assignment() {
   const [assignments, setAssignments] = useState([]);
   const [liveClasses, setLiveClasses] = useState([]);
@@ -38,7 +213,7 @@ export default function Assignment() {
   const fetchAll = async () => {
     setLoading(true);
     const schoolId = getSchoolId();
-    
+
     if (!schoolId) {
       toast.error("No school ID found. Please login again.");
       setLoading(false);
@@ -52,12 +227,12 @@ export default function Assignment() {
         api.get("/subjects", { params: { school_id: schoolId } }),
         api.get("/employees", { params: { school_id: schoolId } })
       ]);
-      
+
       setAssignments(assignmentsRes.data?.data?.data || assignmentsRes.data?.data || []);
       setLiveClasses(liveClassesRes.data?.data?.data || liveClassesRes.data?.data || []);
       setSubjects(subjectsRes.data?.data || subjectsRes.data || []);
       setEmployees(employeesRes.data?.data || employeesRes.data || []);
-      
+
     } catch (err) {
       console.error("❌ Fetch error:", err);
       toast.error("Failed to fetch data");
@@ -73,7 +248,7 @@ export default function Assignment() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaveLoading(true);
-    
+
     const schoolId = getSchoolId();
     if (!schoolId) {
       toast.error("No school ID found. Please login again.");
@@ -95,14 +270,14 @@ export default function Assignment() {
         await api.post("/assignments", payload);
         toast.success("Assignment created successfully");
       }
-      
+
       setShowModal(false);
       resetForm();
       await fetchAll();
-      
+
     } catch (error) {
       console.error("❌ Save error:", error);
-      
+
       if (error.response?.data?.errors) {
         Object.values(error.response.data.errors).forEach(messages => {
           messages.forEach(message => toast.error(message));
@@ -137,7 +312,7 @@ export default function Assignment() {
 
   const handleDelete = async (id) => {
     if (!confirm("Are you sure you want to delete this assignment?")) return;
-    
+
     try {
       const schoolId = getSchoolId();
       await api.delete(`/assignments/${id}`, {
@@ -306,7 +481,7 @@ export default function Assignment() {
         searchPlaceholder="Search by title, subject or teacher..."
         onSearch={(data, term) => {
           const lowerTerm = term.toLowerCase();
-          return data.filter(item => 
+          return data.filter(item =>
             item.title?.toLowerCase().includes(lowerTerm) ||
             item.subject_name?.toLowerCase().includes(lowerTerm) ||
             item.teacher_name?.toLowerCase().includes(lowerTerm)
@@ -342,22 +517,19 @@ export default function Assignment() {
                   </select>
                 </div>
 
+                {/* ✅ Searchable Subject Dropdown */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
                     Subject <span className="text-red-400">*</span>
                   </label>
-                  <select
+                  <SearchableSelect
+                    options={subjects.map((s) => ({ value: s.id, label: s.name }))}
                     value={form.subject_id}
-                    onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                    required
+                    onChange={(val) => setForm({ ...form, subject_id: val })}
+                    placeholder="Select Subject"
                     disabled={saveLoading}
-                  >
-                    <option value="">Select Subject</option>
-                    {subjects.map((subject) => (
-                      <option key={subject.id} value={subject.id}>{subject.name}</option>
-                    ))}
-                  </select>
+                    required
+                  />
                 </div>
               </div>
 

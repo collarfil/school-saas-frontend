@@ -1,8 +1,7 @@
-// src/pages/PublicAdmissionList.jsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import publicApi from "../api/axios"; // <-- Use publicApi instead of api
+import publicApi from "../api/axios"; // Uses the updated publicApi without auth redirect
 import { Search, Calendar, Award, CheckCircle, Users, FileText, ExternalLink } from "lucide-react";
 
 export default function PublicAdmissionList() {
@@ -26,8 +25,9 @@ export default function PublicAdmissionList() {
     setLoading(true);
     try {
       const schoolId = getSchoolId();
-      const response = await publicApi.get("/admission-lists", {
-        params: { school_id: schoolId, is_published: true }
+      // UPDATED ROUTE: Points to /public/admissions/lists
+      const response = await publicApi.get("/public/admissions/lists", {
+        params: { school_id: schoolId }
       });
       
       const listsData = response.data?.data?.data || response.data?.data || [];
@@ -35,7 +35,6 @@ export default function PublicAdmissionList() {
     } catch (err) {
       console.error('Failed to fetch admission lists:', err);
       setLists([]);
-      // Don't show toast for public errors - just show empty state
     } finally {
       setLoading(false);
     }
@@ -44,7 +43,8 @@ export default function PublicAdmissionList() {
   const fetchListApplicants = async (listId) => {
     try {
       const schoolId = getSchoolId();
-      const response = await publicApi.get(`/admission-lists/${listId}`, {
+      // UPDATED ROUTE: Points to /public/admissions/lists/{id}
+      const response = await publicApi.get(`/public/admissions/lists/${listId}`, {
         params: { school_id: schoolId }
       });
       
@@ -169,7 +169,7 @@ export default function PublicAdmissionList() {
               </div>
               <button
                 onClick={() => { setShowApplicants(false); setSelectedList(null); setApplicants([]); }}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-colors"
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-colors text-white"
               >
                 ← Back to Lists
               </button>

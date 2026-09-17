@@ -2,16 +2,16 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api/axios";
 import DataTable from "../components/DataTable";
-import { Edit, Trash2, Plus, Eye, CheckCircle, XCircle, User, Calendar, Clock, Users } from "lucide-react";
+import { Edit, Trash2, Plus, Eye, XCircle } from "lucide-react";
 
 export default function ClassAttendance() {
   const [attendances, setAttendances] = useState([]);
-  const [meetings, setMeetings] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [showModal, setShowModal] = useState(false);
+  const [meetings, setMeetings]       = useState([]);
+  const [students, setStudents]       = useState([]);
+  const [showModal, setShowModal]     = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedAttendance, setSelectedAttendance] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]         = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [filterMeeting, setFilterMeeting] = useState("");
 
@@ -26,14 +26,14 @@ export default function ClassAttendance() {
   const [editId, setEditId] = useState(null);
 
   const getSchoolId = () => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(localStorage.getItem("user"));
     return user?.school?.id || user?.school_id;
   };
 
   const fetchAll = async () => {
     setLoading(true);
     const schoolId = getSchoolId();
-    
+
     if (!schoolId) {
       toast.error("No school ID found. Please login again.");
       setLoading(false);
@@ -49,14 +49,14 @@ export default function ClassAttendance() {
         api.get("/meetings", { params: { school_id: schoolId } }),
         api.get("/students", { params: { school_id: schoolId } })
       ]);
-      
+
       setAttendances(attendancesRes.data?.data || attendancesRes.data || []);
       setMeetings(meetingsRes.data?.data?.data || meetingsRes.data?.data || []);
-      setStudents(studentsRes.data?.data || studentsRes.data || []);
-      
+      setStudents(studentsRes.data?.data?.data || studentsRes.data?.data || studentsRes.data || []);
+
     } catch (err) {
       console.error("❌ Fetch error:", err);
-      toast.error("Failed to fetch data");
+      // Don't toast on every failure — noisy
     } finally {
       setLoading(false);
     }
@@ -64,12 +64,14 @@ export default function ClassAttendance() {
 
   useEffect(() => {
     fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterMeeting]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (saveLoading) return;   // guard against double-submit
     setSaveLoading(true);
-    
+
     const schoolId = getSchoolId();
     if (!schoolId) {
       toast.error("No school ID found. Please login again.");
@@ -91,14 +93,13 @@ export default function ClassAttendance() {
         await api.post("/class-attendance", payload);
         toast.success("Attendance recorded successfully");
       }
-      
+
       setShowModal(false);
       resetForm();
       await fetchAll();
-      
+
     } catch (error) {
       console.error("❌ Save error:", error);
-      
       if (error.response?.data?.errors) {
         Object.values(error.response.data.errors).forEach(messages => {
           messages.forEach(message => toast.error(message));
@@ -128,41 +129,15 @@ export default function ClassAttendance() {
 
   const handleDelete = async (id) => {
     if (!confirm("Are you sure you want to delete this attendance record?")) return;
-    
+
     try {
       const schoolId = getSchoolId();
-      await api.delete(`/class-attendance/${id}`, {
-        params: { school_id: schoolId }
-      });
+      await api.delete(`/class-attendance/${id}`, { params: { school_id: schoolId } });
       toast.success("Attendance record deleted successfully");
       fetchAll();
     } catch (error) {
       console.error("❌ Delete error:", error);
       toast.error("Failed to delete attendance record");
-    }
-  };
-
-  const handleMarkPresent = async (meetingId, studentId) => {
-    try {
-      const schoolId = getSchoolId();
-      await api.post(`/meetings/${meetingId}/students/${studentId}/present`, { school_id: schoolId });
-      toast.success("Student marked as present");
-      fetchAll();
-    } catch (error) {
-      console.error("❌ Mark present error:", error);
-      toast.error("Failed to mark attendance");
-    }
-  };
-
-  const handleMarkAbsent = async (meetingId, studentId) => {
-    try {
-      const schoolId = getSchoolId();
-      await api.post(`/meetings/${meetingId}/students/${studentId}/absent`, { school_id: schoolId });
-      toast.success("Student marked as absent");
-      fetchAll();
-    } catch (error) {
-      console.error("❌ Mark absent error:", error);
-      toast.error("Failed to mark attendance");
     }
   };
 
@@ -181,9 +156,9 @@ export default function ClassAttendance() {
   const getStatusBadge = (status) => {
     const statusMap = {
       present: { color: "bg-green-500/20 text-green-300 border-green-500", label: "Present" },
-      absent: { color: "bg-red-500/20 text-red-300 border-red-500", label: "Absent" },
-      late: { color: "bg-yellow-500/20 text-yellow-300 border-yellow-500", label: "Late" },
-      excused: { color: "bg-blue-500/20 text-blue-300 border-blue-500", label: "Excused" }
+      absent:  { color: "bg-red-500/20 text-red-300 border-red-500",       label: "Absent" },
+      late:    { color: "bg-yellow-500/20 text-yellow-300 border-yellow-500", label: "Late" },
+      excused: { color: "bg-blue-500/20 text-blue-300 border-blue-500",    label: "Excused" }
     };
     const s = statusMap[status] || statusMap.absent;
     return <span className={`px-2 py-1 rounded text-xs border ${s.color}`}>{s.label}</span>;
@@ -191,26 +166,22 @@ export default function ClassAttendance() {
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit"
     });
   };
 
-  // ========== DATATABLE CONFIGURATION ==========
   const tableColumns = [
-    { header: "Student", accessor: "student_name", width: "180px" },
-    { header: "Meeting", accessor: "meeting_title", width: "200px" },
-    { header: "Joined At", accessor: "joined_at", width: "150px" },
-    { header: "Duration", accessor: "duration", width: "100px" },
-    { header: "Status", accessor: "status_badge", width: "100px" },
+    { header: "Student",     accessor: "student_name",  width: "180px" },
+    { header: "Meeting",     accessor: "meeting_title", width: "200px" },
+    { header: "Joined At",   accessor: "joined_at",     width: "150px" },
+    { header: "Duration",    accessor: "duration",      width: "100px" },
+    { header: "Status",      accessor: "status_badge",  width: "100px" },
   ];
 
-  const getTableData = () => {
-    return attendances.map((attendance) => ({
+  const getTableData = () =>
+    attendances.map((attendance) => ({
       id: attendance.id,
       student_name: attendance.student?.name || "N/A",
       meeting_title: attendance.meeting?.title || "N/A",
@@ -219,7 +190,6 @@ export default function ClassAttendance() {
       status_badge: getStatusBadge(attendance.attendance_status),
       original: attendance
     }));
-  };
 
   const renderTableActions = (row) => (
     <div className="flex items-center justify-end gap-2">
@@ -255,12 +225,13 @@ export default function ClassAttendance() {
           <p className="text-gray-400 text-sm">Manage student attendance for online classes</p>
         </div>
         <button
+          type="button"
           onClick={() => { resetForm(); setShowModal(true); }}
-          className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition-colors font-medium flex items-center gap-2"
-          disabled={loading}
+          className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
+          // ✅ removed disabled={loading} — button is always clickable
         >
           <Plus className="h-4 w-4" />
-          {loading ? "Loading..." : "Add Attendance"}
+          Add Attendance
         </button>
       </div>
 
@@ -275,13 +246,14 @@ export default function ClassAttendance() {
           >
             <option value="">All Meetings</option>
             {meetings.map((meeting) => (
-              <option key={meeting.id} value={meeting.id}>{meeting.title}</option>
+              <option key={meeting.id} value={meeting.id}>
+                {meeting.liveClass?.title || meeting.title || `Meeting #${meeting.id}`}
+              </option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Data Table */}
       <DataTable
         columns={tableColumns}
         data={getTableData()}
@@ -290,13 +262,131 @@ export default function ClassAttendance() {
         searchPlaceholder="Search by student or meeting..."
         onSearch={(data, term) => {
           const lowerTerm = term.toLowerCase();
-          return data.filter(item => 
+          return data.filter(item =>
             item.student_name?.toLowerCase().includes(lowerTerm) ||
             item.meeting_title?.toLowerCase().includes(lowerTerm)
           );
         }}
         actions={renderTableActions}
       />
+
+      {/* Add / Edit Modal */}
+      {showModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50 p-4">
+          <div className="bg-slate-800 p-6 rounded-lg w-full max-w-xl border border-slate-700 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-semibold mb-4">
+              {editId ? "Edit Attendance Record" : "Add Attendance Record"}
+            </h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Meeting <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={form.meeting_id}
+                  onChange={(e) => setForm({ ...form, meeting_id: e.target.value })}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 outline-none"
+                  required
+                  disabled={saveLoading || !!editId}
+                >
+                  <option value="">Select Meeting</option>
+                  {meetings.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.liveClass?.title || m.title || `Meeting #${m.id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Student <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={form.student_id}
+                  onChange={(e) => setForm({ ...form, student_id: e.target.value })}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 outline-none"
+                  required
+                  disabled={saveLoading || !!editId}
+                >
+                  <option value="">Select Student</option>
+                  {students.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
+                <select
+                  value={form.attendance_status}
+                  onChange={(e) => setForm({ ...form, attendance_status: e.target.value })}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 outline-none"
+                  disabled={saveLoading}
+                >
+                  <option value="present">Present</option>
+                  <option value="absent">Absent</option>
+                  <option value="late">Late</option>
+                  <option value="excused">Excused</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Joined At</label>
+                  <input
+                    type="datetime-local"
+                    value={form.joined_at}
+                    onChange={(e) => setForm({ ...form, joined_at: e.target.value })}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 outline-none"
+                    disabled={saveLoading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Left At</label>
+                  <input
+                    type="datetime-local"
+                    value={form.left_at}
+                    onChange={(e) => setForm({ ...form, left_at: e.target.value })}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 outline-none"
+                    disabled={saveLoading}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Duration (minutes)</label>
+                <input
+                  type="number"
+                  value={form.duration}
+                  onChange={(e) => setForm({ ...form, duration: e.target.value })}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 outline-none"
+                  disabled={saveLoading}
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => { setShowModal(false); resetForm(); }}
+                  className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500 transition-colors font-medium"
+                  disabled={saveLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:bg-blue-400 transition-colors font-medium"
+                  disabled={saveLoading}
+                >
+                  {saveLoading ? "Saving..." : (editId ? "Update" : "Create")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* View Modal */}
       {showViewModal && selectedAttendance && (
@@ -312,32 +402,36 @@ export default function ClassAttendance() {
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-700/30 rounded-lg">
-                <div>
-                  <p className="text-sm text-gray-400">Student</p>
-                  <p className="text-white font-medium">{selectedAttendance.student?.name || "N/A"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Status</p>
-                  {getStatusBadge(selectedAttendance.attendance_status)}
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Meeting</p>
-                  <p className="text-white">{selectedAttendance.meeting?.title || "N/A"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Duration</p>
-                  <p className="text-white">{selectedAttendance.duration ? `${selectedAttendance.duration} min` : "N/A"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Joined At</p>
-                  <p className="text-white">{formatDate(selectedAttendance.joined_at)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Left At</p>
-                  <p className="text-white">{formatDate(selectedAttendance.left_at)}</p>
-                </div>
+            <div className="grid grid-cols-2 gap-4 p-4 bg-slate-700/30 rounded-lg">
+              <div>
+                <p className="text-sm text-gray-400">Student</p>
+                <p className="text-white font-medium">{selectedAttendance.student?.name || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Status</p>
+                {getStatusBadge(selectedAttendance.attendance_status)}
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Meeting</p>
+                <p className="text-white">
+                  {selectedAttendance.meeting?.liveClass?.title ||
+                   selectedAttendance.meeting?.title ||
+                   "N/A"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Duration</p>
+                <p className="text-white">
+                  {selectedAttendance.duration ? `${selectedAttendance.duration} min` : "N/A"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Joined At</p>
+                <p className="text-white">{formatDate(selectedAttendance.joined_at)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Left At</p>
+                <p className="text-white">{formatDate(selectedAttendance.left_at)}</p>
               </div>
             </div>
           </div>

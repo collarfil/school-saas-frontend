@@ -42,7 +42,7 @@ api.interceptors.response.use(
 );
 
 // ============================================
-// Public API instance (no auth)
+// Public API instance (no auth redirect)
 // Used for public admission portal, school directory, etc.
 // ============================================
 const publicApi = axios.create({
@@ -52,6 +52,15 @@ const publicApi = axios.create({
     Accept: "application/json",
   },
 });
+
+// Interceptor to ensure public requests NEVER force a login redirect on 401
+publicApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Silently reject error without clearing token or redirecting to /login
+    return Promise.reject(error);
+  }
+);
 
 export { publicApi };
 export default api;
